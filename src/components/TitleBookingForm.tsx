@@ -72,8 +72,8 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
       setErrorMsg('In-Game User ID is required.');
       return;
     }
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMsg('A valid email address is required.');
+    if (email.trim() && !email.includes('@')) {
+      setErrorMsg('If specified, the email address must be a valid email containing "@".');
       return;
     }
     if (!selectedAllianceId) {
@@ -151,7 +151,9 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Name */}
             <div>
-              <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">In-Game Name</label>
+              <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">
+                In-Game Name <span className="text-rose-500 font-extrabold text-sm font-sans">*</span>
+              </label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
@@ -167,7 +169,9 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
 
             {/* User ID */}
             <div>
-              <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">User ID</label>
+              <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">
+                User ID <span className="text-rose-500 font-extrabold text-sm font-sans">*</span>
+              </label>
               <div className="relative">
                 <Hash className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
@@ -183,23 +187,30 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
 
             {/* Email */}
             <div className="md:col-span-2">
-              <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">Email Address</label>
+              <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">
+                Email Address <span className="text-slate-500 font-normal lowercase italic pl-1">(optional)</span>
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   id="form-email"
                   type="email"
-                  placeholder="commander@google.com"
+                  placeholder="commander@gmail.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl py-3 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition-all font-sans"
                 />
               </div>
+              <p className="text-[10.5px] text-slate-400 mt-1.5 leading-relaxed font-sans font-medium">
+                🔒 Giving your email is <b>optional</b> and will only be used for reminding you about your appointment and if there are any changes that have been made to it.
+              </p>
             </div>
 
             {/* Alliance Selection */}
             <div className="md:col-span-2">
-              <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">Alliance Affiliation</label>
+              <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">
+                Alliance Affiliation <span className="text-rose-500 font-extrabold text-sm font-sans">*</span>
+              </label>
               <div className="relative mb-3">
                 <Shield className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <select

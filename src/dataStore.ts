@@ -37,8 +37,8 @@ export function loadDailySlots(eventType: EventType, bookings: Booking[]): Slot[
   const baseSlots = generateEmptySlots();
   
   // High-priority system locked slots (e.g., midnight maintenance, and active hours blocks)
-  // Let's locks slots like 02:00-04:00 for system calibration & server restarts
-  const lockedTimes = ['02:00', '02:30', '03:00', '03:30', '04:00'];
+  // No locked times are active in this range anymore
+  const lockedTimes: string[] = [];
   
   baseSlots.forEach(slot => {
     if (lockedTimes.includes(slot.time)) {

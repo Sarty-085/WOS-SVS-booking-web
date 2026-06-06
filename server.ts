@@ -359,6 +359,11 @@ function triggerQuietBackgroundSync() {
 // SMTP Email dispatch helper using nodemailer
 async function sendSmtpEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
   try {
+    if (!to || !to.trim() || !to.includes('@')) {
+      console.log(`[SMTP Skipped] Invalid or empty recipient email: "${to}". Tried sending "${subject}".`);
+      return;
+    }
+
     const hostRes = await pool.query("SELECT value FROM settings WHERE key = 'smtp_host'");
     const host = hostRes.rows[0]?.value || process.env.SMTP_HOST || 'smtp.gmail.com';
 

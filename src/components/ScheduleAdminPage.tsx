@@ -221,7 +221,7 @@ export default function ScheduleAdminPage({
   };
 
   useEffect(() => {
-    if ((activeAdminTab === 'Audit Logs' || activeAdminTab === 'Google Sheets Sync') && !isAdmin) {
+    if (!isAdmin && activeAdminTab !== 'Dashboard' && activeAdminTab !== 'Weeks') {
       setActiveAdminTab('Dashboard');
     }
   }, [activeAdminTab, isAdmin]);
@@ -448,7 +448,7 @@ export default function ScheduleAdminPage({
             {/* Sidebar menu links with active design requested */}
             <nav className="flex flex-col gap-1 text-left">
               {(['Dashboard', 'Bookings', 'Audit Logs', 'Google Sheets Sync', 'Alliances', 'Weeks'] as AdminTab[])
-                .filter((t) => (t !== 'Audit Logs' && t !== 'Google Sheets Sync') || isAdmin)
+                .filter((t) => isAdmin || t === 'Dashboard' || t === 'Weeks')
                 .map((tab) => {
                 const isActive = activeAdminTab === tab;
                 let IconComp = BarChart2;

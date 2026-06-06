@@ -332,22 +332,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#020617] text-[#dce1fb] font-sans flex flex-col justify-between relative overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/40 via-[#020617] to-[#020617]">
       
-      {/* GLOBAL DEMO BANNER */}
-      {demoBannerOpen && (
-        <div className="bg-gradient-to-r from-sky-950 via-[#081430] to-indigo-950 border-b border-sky-500/25 py-2 px-4 text-center text-xs flex items-center justify-between gap-3 font-mono">
-          <div className="flex items-center gap-2 text-left mx-auto">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping shrink-0" />
-            <span className="text-cyan-300 font-bold">ALLIANCE SUPERVISOR CHANNELS ONLINE</span>
-            <span className="hidden md:inline text-slate-400">• Full write permissions enabled for testing. Rename, delete, create alliances, or edit slot times dynamic live!</span>
-          </div>
-          <button 
-            onClick={() => setDemoBannerOpen(false)}
-            className="text-slate-400 hover:text-white font-bold text-sm px-1.5 focus:outline-none"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      {/* GLOBAL DEMO BANNER REMOVED */}
 
       {/* HEADER NAVBAR CONTAINER */}
       <header className="sticky top-0 z-40 bg-[#020617]/75 backdrop-blur-md border-b border-slate-900">
