@@ -4,7 +4,7 @@ import {
   Trash2, Edit, Check, RefreshCw, Layers, Sparkles, LogOut, Clock, Play, MapPin, CheckCircle
 } from 'lucide-react';
 import { Alliance, Booking, Slot, AuditLog, EventType, SlotStatus } from '../types';
-import { loadDailySlots } from '../dataStore';
+import { loadDailySlots, CAMPAIGN_WEEKS } from '../dataStore';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface ScheduleAdminPageProps {
@@ -15,6 +15,8 @@ interface ScheduleAdminPageProps {
   selectedDay: EventType;
   isAdmin: boolean;
   adminUsername: string;
+  activeWeek: string;
+  onChangeActiveWeek: (week: string) => void;
   onSetSelectedDay: (day: EventType) => void;
   onAddAlliance: (name: string, tag: string, color: string) => void;
   onRenameAlliance: (id: string, name: string) => void;
@@ -35,6 +37,8 @@ export default function ScheduleAdminPage({
   selectedDay,
   isAdmin,
   adminUsername,
+  activeWeek,
+  onChangeActiveWeek,
   onSetSelectedDay,
   onAddAlliance,
   onRenameAlliance,
@@ -295,32 +299,56 @@ export default function ScheduleAdminPage({
     return Math.round((bookedCount / totalPlayableSlots) * 100);
   };
 
+  const getWeekStartDate = (activeWeekId: string): Date => {
+    const matched = CAMPAIGN_WEEKS.find(w => w.id === activeWeekId);
+    if (!matched) {
+      // Fallback to Week 23 start (June 7, 2026)
+      return new Date(Date.UTC(2026, 5, 7, 0, 0, 0, 0));
+    }
+    try {
+      // Label format: "Week XX: Jun 07 - Jun 13"
+      const parts = matched.label.split(': ');
+      const range = parts[1]; // "Jun 07 - Jun 13"
+      const startStr = range.split(' - ')[0]; // "Jun 07"
+      const [monthAbbr, dayStr] = startStr.trim().split(/\s+/);
+      
+      const day = parseInt(dayStr, 10);
+      const months: Record<string, number> = {
+        Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+        Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
+      };
+      const month = months[monthAbbr] !== undefined ? months[monthAbbr] : 5;
+      const year = 2026; // Server/system current year is 2026
+      return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+    } catch (err) {
+      console.error("Error parsing week date:", err);
+      // Fallback to Week 23 start
+      return new Date(Date.UTC(2026, 5, 7, 0, 0, 0, 0));
+    }
+  };
+
   const getCommenceCountdownText = (targetDayNum: number) => {
-    const currentUtcDay = nowUtc.getUTCDay();
+    const weekStartDate = getWeekStartDate(activeWeek);
     
-    // If today is the target day, it means it already commenced today at 00:00 UTC
-    if (currentUtcDay === targetDayNum) {
-      return "commenced today (ongoing)";
-    }
-
-    let daysDiff = targetDayNum - currentUtcDay;
-    if (daysDiff < 0) {
-      daysDiff += 7;
-    } else if (daysDiff === 0) {
-      daysDiff += 7;
-    }
-
-    // Target date at 00:00 UTC on that target day
-    const targetDate = new Date(Date.UTC(
-      nowUtc.getUTCFullYear(),
-      nowUtc.getUTCMonth(),
-      nowUtc.getUTCDate() + daysDiff,
-      0, 0, 0, 0
-    ));
+    // Target date is weekStartDate plus targetDayNum days (0=Sunday, 1=Monday, 2=Tuesday, etc)
+    const targetDate = new Date(weekStartDate.getTime());
+    targetDate.setUTCDate(weekStartDate.getUTCDate() + targetDayNum);
+    targetDate.setUTCHours(0, 0, 0, 0);
 
     const diffMs = targetDate.getTime() - nowUtc.getTime();
-    if (diffMs <= 0) {
+
+    // Check if both nowUtc and targetDate are in the same UTC day
+    const isSameUtcDay = 
+      nowUtc.getUTCFullYear() === targetDate.getUTCFullYear() &&
+      nowUtc.getUTCMonth() === targetDate.getUTCMonth() &&
+      nowUtc.getUTCDate() === targetDate.getUTCDate();
+
+    if (isSameUtcDay) {
       return "commenced today (ongoing)";
+    }
+
+    if (diffMs <= 0) {
+      return "commenced (concluded)";
     }
 
     const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -342,7 +370,10 @@ export default function ScheduleAdminPage({
     return bookings.filter(b => b.eventType === day).length;
   };
 
-  const getWeekText = () => "Week 42: Oct 23 - Oct 29";
+  const getWeekText = () => {
+    const matched = CAMPAIGN_WEEKS.find(w => w.id === activeWeek);
+    return matched ? matched.label : "Week 23: Jun 07 - Jun 13";
+  };
 
   const getAllianceByBooking = (allianceId: string) => {
     return alliances.find(a => a.id === allianceId);
@@ -526,11 +557,21 @@ export default function ScheduleAdminPage({
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-950 rounded-lg border border-slate-800">
                   <select 
                     id="week-selector"
-                    className="bg-transparent text-xs font-mono font-bold text-sky-400 focus:outline-none cursor-pointer appearance-none pr-4 relative"
-                    defaultValue="w42"
+                    className="bg-transparent text-xs font-mono font-bold text-sky-450 focus:outline-none cursor-pointer appearance-none pr-4 relative"
+                    value={activeWeek}
+                    onChange={(e) => {
+                      if (!isAdmin) {
+                        alert("Only Elevated Commanders can re-route the active system reservation cycle.");
+                        return;
+                      }
+                      onChangeActiveWeek(e.target.value);
+                    }}
                   >
-                    <option value="w42" className="bg-slate-950 text-white">{getWeekText()}</option>
-                    <option value="w43" className="bg-slate-950 text-slate-400">Week 43: Oct 30 - Nov 05</option>
+                    {CAMPAIGN_WEEKS.map(w => (
+                      <option key={w.id} value={w.id} className="bg-slate-950 text-white">
+                        {w.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <span className="text-[10px] bg-emerald-950 font-bold text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono">OPEN</span>
@@ -1237,21 +1278,47 @@ export default function ScheduleAdminPage({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl border border-cyan-500/20 bg-cyan-950/10 flex justify-between items-center">
-                  <div>
-                    <h4 className="font-bold text-white text-sm">Week 42: Oct 23 - Oct 29</h4>
-                    <p className="text-xs text-slate-400 mt-1 font-mono">Current active state reservation window</p>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold bg-emerald-950 border border-emerald-500/20 px-2 py-1 rounded text-emerald-400">ACTIVE</span>
-                </div>
-
-                <div className="p-4 rounded-xl border border-slate-850 bg-slate-950/40 opacity-70 flex justify-between items-center">
-                  <div>
-                    <h4 className="font-bold text-slate-350 text-sm">Week 43: Oct 30 - Nov 05</h4>
-                    <p className="text-xs text-slate-500 mt-1 font-mono">Pre-seeding locks open in 3 days</p>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold bg-indigo-950 border border-indigo-505/20 px-2 py-1 rounded text-indigo-400 text-slate-400">QUEUED</span>
-                </div>
+                {CAMPAIGN_WEEKS.map(wk => {
+                  const isActive = wk.id === activeWeek;
+                  return (
+                    <div 
+                      key={wk.id} 
+                      className={`p-4 rounded-xl border flex justify-between items-center ${
+                        isActive 
+                          ? 'border-cyan-500/20 bg-cyan-950/10' 
+                          : 'border-slate-800/60 bg-slate-950/40 opacity-75'
+                      }`}
+                    >
+                      <div>
+                        <h4 className="font-bold text-white text-sm">{wk.label} </h4>
+                        <p className="text-xs text-slate-400 mt-1 font-mono">{wk.description}</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        {isActive ? (
+                          <span className="text-[10px] font-mono font-bold bg-emerald-950 border border-emerald-500/20 px-2 py-1 rounded text-emerald-400">
+                            ACTIVE
+                          </span>
+                        ) : (
+                          <>
+                            {isAdmin ? (
+                              <button
+                                onClick={() => onChangeActiveWeek(wk.id)}
+                                className="text-[10px] font-mono font-bold bg-sky-950/60 border border-sky-500/30 text-sky-450 hover:bg-sky-900/60 transition-colors px-2.5 py-1 rounded cursor-pointer"
+                              >
+                                SET ACTIVE
+                              </button>
+                            ) : (
+                              <span className="text-[10px] font-mono font-bold bg-indigo-950 border border-indigo-500/20 px-2 py-1 rounded text-indigo-400">
+                                QUEUED
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

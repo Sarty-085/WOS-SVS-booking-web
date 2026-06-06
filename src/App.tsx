@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { 
   INITIAL_ALLIANCES, INITIAL_BOOKINGS, INITIAL_AUDIT_LOGS, 
-  loadDailySlots, generateEmptySlots 
+  loadDailySlots, generateEmptySlots, CAMPAIGN_WEEKS 
 } from './dataStore';
 import { Alliance, Booking, Slot, AuditLog, EventType } from './types';
 import LandingPage from './components/LandingPage';
@@ -25,6 +25,7 @@ export default function App() {
   const [alliances, setAlliances] = useState<Alliance[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [activeWeek, setActiveWeek] = useState<string>('w23');
   
   // Selected Event Scheduling day (Monday by default)
   const [selectedDay, setSelectedDay] = useState<EventType>('monday');
@@ -59,6 +60,15 @@ export default function App() {
           const logs = await auditRes.json();
           setAuditLogs(logs);
         }
+
+        // Fetch active reservation week setting from DB
+        const valRes = await fetch('/api/settings/active_week');
+        if (valRes.ok) {
+          const data = await valRes.json();
+          if (data.value) {
+            setActiveWeek(data.value);
+          }
+        }
       } catch (e) {
         console.error("Error loading data from API:", e);
       }
@@ -73,6 +83,27 @@ export default function App() {
       setAdminUsername(savedUser);
     }
   }, []);
+
+  // Change active reservation week in database
+  const handleChangeActiveWeek = async (newWeek: string) => {
+    try {
+      const response = await fetch('/api/settings/active_week', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: newWeek })
+      });
+      if (response.ok) {
+        setActiveWeek(newWeek);
+        addAuditLog(
+          isAdmin ? adminUsername : 'System',
+          'edit_alliance',
+          `Operational horizon shifted to week: ${newWeek.toUpperCase()}`
+        );
+      }
+    } catch (err) {
+      console.error("Error setting active week:", err);
+    }
+  };
 
   // Log audit helper
   const addAuditLog = async (operator: string, action: AuditLog['action'], details: string) => {
@@ -320,8 +351,9 @@ export default function App() {
     handleAdminLogin('Sarthak_Admin');
   };
 
-  // Compute live slots list for rendering based on current selectedDay and bookings
-  const currentSlotsList = loadDailySlots(selectedDay, bookings);
+  // Compute live slots list for rendering based on current selectedDay and bookings of the active week only
+  const filteredBookings = bookings.filter(b => (b.week || 'w23') === activeWeek);
+  const currentSlotsList = loadDailySlots(selectedDay, filteredBookings);
 
   // Navigation redirectors
   const handleBookDayDirect = (day: EventType) => {
@@ -542,6 +574,7 @@ export default function App() {
                   setActiveTab('Schedule'); // Slide direct to Schedule grid to see their results
                 }} 
                 initialSelectedDay={selectedDay}
+                activeWeek={activeWeek}
               />
             </motion.div>
           )}
@@ -562,6 +595,8 @@ export default function App() {
                 selectedDay={selectedDay}
                 isAdmin={isAdmin}
                 adminUsername={adminUsername}
+                activeWeek={activeWeek}
+                onChangeActiveWeek={handleChangeActiveWeek}
                 onSetSelectedDay={setSelectedDay}
                 onAddAlliance={handleAddAlliance}
                 onRenameAlliance={handleRenameAlliance}

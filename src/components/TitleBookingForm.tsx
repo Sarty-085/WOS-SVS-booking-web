@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Lock, User, Hash, Mail, Shield, Zap, Calendar, ClipboardCheck, BellRing } from 'lucide-react';
 import { Alliance, Booking, EventType } from '../types';
+import { CAMPAIGN_WEEKS } from '../dataStore';
 import { motion } from 'motion/react';
 
 interface TitleBookingFormProps {
   alliances: Alliance[];
   onAddBooking: (booking: Omit<Booking, 'id' | 'timestamp'>) => void;
   initialSelectedDay?: EventType;
+  activeWeek?: string;
 }
 
-export default function TitleBookingForm({ alliances, onAddBooking, initialSelectedDay = 'monday' }: TitleBookingFormProps) {
+export default function TitleBookingForm({ alliances, onAddBooking, initialSelectedDay = 'monday', activeWeek = 'w23' }: TitleBookingFormProps) {
   // Input fields state
   const [playerName, setPlayerName] = useState('');
   const [userId, setUserId] = useState('');
@@ -112,13 +114,21 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
       <div className="absolute bottom-1/2 left-10 w-[250px] h-[250px] bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
 
       {/* Header Container */}
-      <div className="text-center md:text-left mb-8 border-b border-slate-800/80 pb-6">
-        <h1 className="font-heading text-3xl md:text-4xl font-extrabold text-white mb-2 tracking-tight">
-          Title Booking <span className="text-silver-cyan">Form</span>
-        </h1>
-        <p className="text-slate-400 text-sm md:text-base">
-          Secure your slot in the upcoming state vs state. High priority score listings always claim supreme authority.
-        </p>
+      <div className="text-center md:text-left mb-8 border-b border-slate-800/80 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-3xl md:text-4xl font-extrabold text-white mb-2 tracking-tight">
+            Title Booking <span className="text-silver-cyan">Form</span>
+          </h1>
+          <p className="text-slate-400 text-sm">
+            Secure your slot in the upcoming state vs state. High priority score listings always claim supreme authority.
+          </p>
+        </div>
+        <div className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl self-start md:self-center text-left">
+          <p className="text-[10px] text-slate-400 font-mono uppercase tracking-widest">Active Horizon</p>
+          <p className="text-xs font-bold font-mono text-sky-450 mt-0.5">
+            {CAMPAIGN_WEEKS.find(w => w.id === activeWeek)?.label || activeWeek}
+          </p>
+        </div>
       </div>
 
       {successMsg && (

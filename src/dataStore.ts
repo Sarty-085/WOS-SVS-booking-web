@@ -1,5 +1,22 @@
 import { Alliance, Booking, Slot, AuditLog, EventType } from './types';
 
+export interface CampaignWeek {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export const CAMPAIGN_WEEKS: CampaignWeek[] = [
+  { id: 'w23', label: "Week 23: Jun 07 - Jun 13", description: "Reservations for the first June event window" },
+  { id: 'w24', label: "Week 24: Jun 14 - Jun 20", description: "Reservations for the Supreme Presidential Event" },
+  { id: 'w25', label: "Week 25: Jun 21 - Jun 27", description: "Consolidated state defense event reserves" },
+  { id: 'w26', label: "Week 26: Jun 28 - Jul 04", description: "Early July alliance clash campaign" },
+  { id: 'w27', label: "Week 27: Jul 05 - Jul 11", description: "Mid-summer state event registry window" },
+  { id: 'w28', label: "Week 28: Jul 12 - Jul 18", description: "Advanced fortress battle reservation list" },
+  { id: 'w29', label: "Week 29: Jul 19 - Jul 25", description: "High-tier commander slot allotment" },
+  { id: 'w30', label: "Week 30: Jul 26 - Aug 01", description: "Late July campaign week registry" }
+];
+
 export const INITIAL_ALLIANCES: Alliance[] = [
   { id: 'all-1', name: 'Bastion Throne', tag: 'BTN', color: '#ec4899' }, // pink
   { id: 'all-2', name: 'Shadow Spies', tag: 'SPY', color: '#a855f7' }, // purple

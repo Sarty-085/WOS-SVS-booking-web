@@ -49,8 +49,11 @@ async function syncPostgresToGoogleSheets(): Promise<{ success: boolean; message
       return { success: false, message: "Service Account is missing client_email or private_key fields." };
     }
 
-    // 2. Fetch all current alliances and bookings
-    const bookingsRes = await pool.query("SELECT * FROM bookings");
+    // 2. Fetch all current alliances and bookings for the active week
+    const actWeekRes = await pool.query("SELECT value FROM settings WHERE key = 'active_week'");
+    const activeWeek = actWeekRes.rows[0]?.value || 'w23';
+
+    const bookingsRes = await pool.query("SELECT * FROM bookings WHERE week = $1", [activeWeek]);
     const alliancesRes = await pool.query("SELECT * FROM alliances ORDER BY name ASC");
 
     const alliances = alliancesRes.rows;
@@ -459,7 +462,8 @@ async function fetchCurrentBookingsFromDb(): Promise<any[]> {
     slotId: r.slot_id,
     backupSlots: JSON.parse(r.backup_slots || '[]'),
     autoAssign: r.auto_assign,
-    timestamp: r.timestamp
+    timestamp: r.timestamp,
+    week: r.week || 'w23'
   }));
 }
 
@@ -837,6 +841,16 @@ async function startServer() {
         );
       `);
 
+      // Migration: Add week column if NOT exists
+      await client.query(`
+        ALTER TABLE bookings ADD COLUMN IF NOT EXISTS week TEXT DEFAULT 'w23';
+      `);
+
+      // Seeding active_week setting if not exist
+      await client.query(`
+        INSERT INTO settings (key, value) VALUES ('active_week', 'w23') ON CONFLICT DO NOTHING;
+      `);
+
       await client.query(`
         CREATE TABLE IF NOT EXISTS audit_logs (
           id TEXT PRIMARY KEY,
@@ -1040,7 +1054,8 @@ async function startServer() {
         slotId: r.slot_id,
         backupSlots: JSON.parse(r.backup_slots),
         autoAssign: r.auto_assign,
-        timestamp: r.timestamp
+        timestamp: r.timestamp,
+        week: r.week || 'w23'
       }));
       res.json(mapped);
     } catch (err: any) {
@@ -1050,14 +1065,20 @@ async function startServer() {
 
   app.post('/api/bookings', async (req, res) => {
     try {
-      const { id, playerName, userId, email, allianceId, eventType, speedupDays, speedupHours, score, slotId, backupSlots, autoAssign, timestamp } = req.body;
+      const { id, playerName, userId, email, allianceId, eventType, speedupDays, speedupHours, score, slotId, backupSlots, autoAssign, timestamp, week } = req.body;
       
       const beforeBookings = await fetchCurrentBookingsFromDb();
 
+      let targetWeek = week;
+      if (!targetWeek) {
+        const actWeekRes = await pool.query("SELECT value FROM settings WHERE key = 'active_week'");
+        targetWeek = actWeekRes.rows[0]?.value || 'w23';
+      }
+
       await pool.query(
-        `INSERT INTO bookings (id, player_name, user_id, email, alliance_id, event_type, speedup_days, speedup_hours, score, slot_id, backup_slots, auto_assign, timestamp)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-        [id, playerName, userId, email, allianceId, eventType, speedupDays, speedupHours, score, slotId, JSON.stringify(backupSlots), autoAssign, timestamp]
+        `INSERT INTO bookings (id, player_name, user_id, email, alliance_id, event_type, speedup_days, speedup_hours, score, slot_id, backup_slots, auto_assign, timestamp, week)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+        [id, playerName, userId, email, allianceId, eventType, speedupDays, speedupHours, score, slotId, JSON.stringify(backupSlots), autoAssign, timestamp, targetWeek]
       );
       
       triggerQuietBackgroundSync();
