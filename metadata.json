@@ -1,0 +1,6 @@
+{
+  "name": "Royal Slots",
+  "description": "A high-precision priority-based State event booking scheduler with an elite royal and icy aesthetic dashboard for alliances and scheduling controllers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

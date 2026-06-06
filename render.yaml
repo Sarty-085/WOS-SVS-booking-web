@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: royal-slots
+    runtime: node
+    region: singapore   # closest to Neon DB (ap-southeast-1)
+    plan: free
+
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Required — your Neon PostgreSQL connection string
+      - key: DATABASE_URL
+        sync: false   # mark as secret; set manually in Render dashboard
+
+      # Optional — Google OAuth Client ID for Sheets integration
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+
+      # Optional — SMTP credentials for email notifications
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+      # Optional — Gemini AI API key
+      - key: GEMINI_API_KEY
+        sync: false
