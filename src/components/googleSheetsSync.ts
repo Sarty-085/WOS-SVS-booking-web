@@ -8,7 +8,7 @@ import { loadDailySlots } from '../dataStore';
 export async function createSpreadsheet(accessToken: string): Promise<string> {
   const payload = {
     properties: {
-      title: "Royal Slots - State Event Registry"
+      title: "Prep Booking - State Event Registry"
     },
     sheets: [
       {

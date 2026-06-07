@@ -454,6 +454,7 @@ async function fetchCurrentBookingsFromDb(): Promise<any[]> {
     playerName: r.player_name,
     userId: r.user_id,
     email: r.email,
+    discordUsername: r.discord_username || '',
     allianceId: r.alliance_id,
     eventType: r.event_type,
     speedupDays: r.speedup_days,
@@ -846,6 +847,11 @@ async function startServer() {
         ALTER TABLE bookings ADD COLUMN IF NOT EXISTS week TEXT DEFAULT 'w23';
       `);
 
+      // Migration: Add discord_username column if NOT exists
+      await client.query(`
+        ALTER TABLE bookings ADD COLUMN IF NOT EXISTS discord_username TEXT DEFAULT '';
+      `);
+
       // Seeding active_week setting if not exist
       await client.query(`
         INSERT INTO settings (key, value) VALUES ('active_week', 'w23') ON CONFLICT DO NOTHING;
@@ -1046,6 +1052,7 @@ async function startServer() {
         playerName: r.player_name,
         userId: r.user_id,
         email: r.email,
+        discordUsername: r.discord_username || '',
         allianceId: r.alliance_id,
         eventType: r.event_type,
         speedupDays: r.speedup_days,
@@ -1065,7 +1072,7 @@ async function startServer() {
 
   app.post('/api/bookings', async (req, res) => {
     try {
-      const { id, playerName, userId, email, allianceId, eventType, speedupDays, speedupHours, score, slotId, backupSlots, autoAssign, timestamp, week } = req.body;
+      const { id, playerName, userId, email, discordUsername, allianceId, eventType, speedupDays, speedupHours, score, slotId, backupSlots, autoAssign, timestamp, week } = req.body;
       
       const beforeBookings = await fetchCurrentBookingsFromDb();
 
@@ -1076,9 +1083,9 @@ async function startServer() {
       }
 
       await pool.query(
-        `INSERT INTO bookings (id, player_name, user_id, email, alliance_id, event_type, speedup_days, speedup_hours, score, slot_id, backup_slots, auto_assign, timestamp, week)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-        [id, playerName, userId, email, allianceId, eventType, speedupDays, speedupHours, score, slotId, JSON.stringify(backupSlots), autoAssign, timestamp, targetWeek]
+        `INSERT INTO bookings (id, player_name, user_id, email, alliance_id, event_type, speedup_days, speedup_hours, score, slot_id, backup_slots, auto_assign, timestamp, week, discord_username)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+        [id, playerName, userId, email, allianceId, eventType, speedupDays, speedupHours, score, slotId, JSON.stringify(backupSlots), autoAssign, timestamp, targetWeek, discordUsername || '']
       );
       
       triggerQuietBackgroundSync();

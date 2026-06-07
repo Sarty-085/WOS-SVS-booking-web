@@ -16,6 +16,7 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
   const [playerName, setPlayerName] = useState('');
   const [userId, setUserId] = useState('');
   const [email, setEmail] = useState('');
+  const [discordUsername, setDiscordUsername] = useState('');
   const [selectedAllianceId, setSelectedAllianceId] = useState('');
   const [eventType, setEventType] = useState<EventType>(initialSelectedDay);
   
@@ -87,6 +88,7 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
       playerName: playerName.trim(),
       userId: userId.trim(),
       email: email.trim(),
+      discordUsername: discordUsername.trim(),
       allianceId: selectedAllianceId,
       eventType,
       speedupDays: speedupDays || 0,
@@ -103,6 +105,7 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
     setPlayerName('');
     setUserId('');
     setEmail('');
+    setDiscordUsername('');
     setSpeedupDays(0);
     setSpeedupHours(0);
   };
@@ -195,25 +198,47 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
               </div>
             </div>
 
-            {/* Email */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">
-                Email Address <span className="text-slate-500 font-normal lowercase italic pl-1">(optional)</span>
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input
-                  id="form-email"
-                  type="email"
-                  placeholder="commander@gmail.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl py-3 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition-all font-sans"
-                />
+            {/* Contact Info (Email & Discord Username) */}
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">
+                  Email Address <span className="text-slate-500 font-normal lowercase italic pl-1">(optional)</span>
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    id="form-email"
+                    type="email"
+                    placeholder="commander@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl py-3 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition-all font-sans"
+                  />
+                </div>
               </div>
-              <p className="text-[10.5px] text-slate-400 mt-1.5 leading-relaxed font-sans font-medium">
-                🔒 Giving your email is <b>optional</b> and will only be used for reminding you about your appointment and if there are any changes that have been made to it.
-              </p>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-400 uppercase tracking-widest mb-1.5 font-bold">
+                  Discord Username <span className="text-slate-500 font-normal lowercase italic pl-1">(optional)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-xs font-mono font-bold text-slate-500">@</span>
+                  <input
+                    id="form-discord"
+                    type="text"
+                    placeholder="e.g. sarthak_cmd"
+                    value={discordUsername}
+                    onChange={(e) => setDiscordUsername(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl py-3 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition-all font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <p className="text-[10.5px] text-slate-400 leading-relaxed font-sans font-medium">
+                  🔒 Providing email and/or Discord username is <b>optional</b>. If supplied, they will be used by our automated notification bot to keep you instantly posted on slot overrides or scheduling confirmations directly.
+                </p>
+              </div>
             </div>
 
             {/* Alliance Selection */}
@@ -440,7 +465,7 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
           className="w-full mt-3 flex items-center justify-center gap-2.5 py-4 rounded-xl font-heading font-semibold text-white royal-gradient-btn active:scale-95 transition-all shadow-lg shadow-blue-500/10 cursor-pointer"
         >
           <Crown className="w-5 h-5" />
-          ESTABLISH RESERVATION REGISTRY
+          BOOK NOW
           <Lock className="w-4 h-4 opacity-75" />
         </button>
 

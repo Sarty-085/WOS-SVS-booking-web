@@ -375,11 +375,11 @@ export default function App() {
             onClick={() => { setActiveTab('Landing'); }}
             className="flex items-center gap-2 cursor-pointer group"
           >
-            <div className="w-8 h-8 rounded-lg royal-gradient-btn flex items-center justify-center p-0.5 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-              <span className="text-white font-heading font-black text-xs">RS</span>
+            <div className="w-8 h-8 rounded-lg royal-gradient-btn flex items-center justify-center p-1.5 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+              <CalendarDays className="text-white w-full h-full" />
             </div>
             <span className="font-heading text-xl font-extrabold text-white tracking-wider uppercase group-hover:text-cyan-400 transition-colors">
-              Royal <span className="text-silver-cyan">Slots</span>
+              Prep <span className="text-silver-cyan">Booking</span>
             </span>
           </div>
 
@@ -430,66 +430,46 @@ export default function App() {
 
           {/* Right Action buttons */}
           <div className="hidden md:flex items-center gap-3.5">
-            {/* Adaptive view rights based on requirement definitions */}
-            {activeTab === 'Landing' ? (
-              <>
-                <button
-                  onClick={() => setActiveTab('Schedule')}
-                  className="px-4.5 py-2 border border-slate-700 hover:border-cyan-500 rounded-lg text-xs font-medium uppercase font-heading transition-colors"
-                >
-                  Schedule
-                </button>
-                <button
-                  onClick={() => setActiveTab('Reservations')}
-                  className="px-5 py-2 rounded-lg royal-gradient-btn text-white text-xs font-bold font-heading hover:brightness-110 shadow-lg shadow-blue-900/40 cursor-pointer"
-                >
-                  Book Slot
-                </button>
-              </>
-            ) : (
-              <>
-                {/* Notifications Bell */}
-                <div className="relative">
-                  <button 
-                    onClick={() => {
-                      setShowNotifications(!showNotifications);
-                      setNotifCount(0);
-                    }}
-                    className="p-2 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <Bell className="w-4 h-4" />
-                    {notifCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-mono font-bold text-white flex items-center justify-center animate-bounce">
-                        {notifCount}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Dropdown panel */}
-                  {showNotifications && (
-                    <div className="absolute right-0 mt-2.5 w-72 p-4 rounded-xl border border-slate-800 bg-[#070d1f] shadow-2xl text-left">
-                      <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider block border-b border-slate-850 pb-1.5 mb-2">TACTICAL NOTIFICATIONS</span>
-                      <div className="flex flex-col gap-2.5 text-xs">
-                        <div className="flex gap-2">
-                          <CheckCircle className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
-                          <p className="text-slate-300"><span className="font-bold text-white">Monday Construction:</span> Cycle is officially OPEN for pre-bookings.</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                          <p className="text-slate-300"><span className="font-bold text-white">Displacement notice:</span> Higher score elements displaced slot vectors at 09:30.</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {isAdmin && (
-                  <div className="inline-flex items-center gap-1.5 bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 font-mono text-[10px] px-3.5 py-2 rounded-xl h-9">
-                    <Shield className="w-3 h-3 text-cyan-400 animate-pulse" />
-                    <span>COMMANDER: AD ELEVATED</span>
-                  </div>
+            {/* Notifications Bell */}
+            <div className="relative">
+              <button 
+                onClick={() => {
+                  setShowNotifications(!showNotifications);
+                  setNotifCount(0);
+                }}
+                className="p-2 border border-slate-800 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <Bell className="w-4 h-4" />
+                {notifCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-mono font-bold text-white flex items-center justify-center animate-bounce">
+                    {notifCount}
+                  </span>
                 )}
-              </>
+              </button>
+
+              {/* Dropdown panel */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-2.5 w-72 p-4 rounded-xl border border-slate-800 bg-[#070d1f] shadow-2xl text-left z-50">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider block border-b border-slate-850 pb-1.5 mb-2">TACTICAL NOTIFICATIONS</span>
+                  <div className="flex flex-col gap-2.5 text-xs">
+                    <div className="flex gap-2">
+                      <CheckCircle className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                      <p className="text-slate-300"><span className="font-bold text-white">Monday Construction:</span> Cycle is officially OPEN for pre-bookings.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                      <p className="text-slate-300"><span className="font-bold text-white">Displacement notice:</span> Higher score elements displaced slot vectors at 09:30.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {isAdmin && (
+              <div className="inline-flex items-center gap-1.5 bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 font-mono text-[10px] px-3.5 py-2 rounded-xl h-9">
+                <Shield className="w-3 h-3 text-cyan-400 animate-pulse" />
+                <span>COMMANDER: AD ELEVATED</span>
+              </div>
             )}
           </div>
 
@@ -664,7 +644,7 @@ export default function App() {
       <footer className="border-t border-slate-900 py-6 md:py-10 bg-slate-950/40 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-heading font-extrabold text-slate-400 uppercase tracking-wider text-sm">Royal Slots</span>
+            <span className="font-heading font-extrabold text-slate-400 uppercase tracking-wider text-sm">Prep Booking</span>
             <span className="text-slate-700">|</span>
             <p className="font-mono text-[11px]">Priority State Engine • UTC Time: 13:30</p>
           </div>

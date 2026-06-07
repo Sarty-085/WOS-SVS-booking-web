@@ -919,52 +919,52 @@ export default function ScheduleAdminPage({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                      {/* Re-allot Time Slot */}
-                      <div>
-                        <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1">Re-allot Time Slot</label>
-                        <select
-                          id="editor-allot-slot"
-                          disabled={!isAdmin}
-                          value={editSlotId}
-                          onChange={(e) => setEditSlotId(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
-                        >
-                          {formatTimeIntervals().map((t) => (
-                            <option key={`edit-${t}`} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      </div>
+                    {isAdmin ? (
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mt-4">
+                        {/* Re-allot Time Slot */}
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1">Re-allot Time Slot</label>
+                          <select
+                            id="editor-allot-slot"
+                            disabled={!isAdmin}
+                            value={editSlotId}
+                            onChange={(e) => setEditSlotId(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
+                          >
+                            {formatTimeIntervals().map((t) => (
+                              <option key={`edit-${t}`} value={t}>{t}</option>
+                            ))}
+                          </select>
+                        </div>
 
-                      {/* Modify Days Speedup */}
-                      <div>
-                        <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1">Days speedup score</label>
-                        <input
-                          id="editor-days"
-                          disabled={!isAdmin}
-                          type="number"
-                          placeholder="Days"
-                          value={editDays}
-                          onChange={(e) => setEditDays(parseInt(e.target.value, 10) || 0)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
-                        />
-                      </div>
+                        {/* Modify Days Speedup */}
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1">Days speedup score</label>
+                          <input
+                            id="editor-days"
+                            disabled={!isAdmin}
+                            type="number"
+                            placeholder="Days"
+                            value={editDays}
+                            onChange={(e) => setEditDays(parseInt(e.target.value, 10) || 0)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
+                          />
+                        </div>
 
-                      {/* Modify Hours Speedup */}
-                      <div>
-                        <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1">Hours speedup score</label>
-                        <input
-                          id="editor-hours"
-                          disabled={!isAdmin}
-                          type="number"
-                          placeholder="Hours"
-                          value={editHours}
-                          onChange={(e) => setEditHours(parseInt(e.target.value, 10) || 0)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
-                        />
-                      </div>
+                        {/* Modify Hours Speedup */}
+                        <div>
+                          <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1">Hours speedup score</label>
+                          <input
+                            id="editor-hours"
+                            disabled={!isAdmin}
+                            type="number"
+                            placeholder="Hours"
+                            value={editHours}
+                            onChange={(e) => setEditHours(parseInt(e.target.value, 10) || 0)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-xs text-white focus:outline-none"
+                          />
+                        </div>
 
-                      {isAdmin ? (
                         <button
                           id="admin-save-booking-btn"
                           onClick={handleSaveModifiedSlot}
@@ -972,12 +972,36 @@ export default function ScheduleAdminPage({
                         >
                           Commit Override
                         </button>
-                      ) : (
-                        <p className="text-[10px] text-slate-500 font-mono italic p-2 border border-slate-850 bg-slate-900/10 rounded">
-                          Write overrides locked. Authentication required.
-                        </p>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border border-slate-800/60 bg-slate-900/10 p-4 rounded-xl text-xs font-mono mt-2">
+                        <div>
+                          <p className="text-slate-500 uppercase tracking-wider text-[10px]">Alliance Affiliation</p>
+                          <p className="text-white font-bold mt-1">
+                            {getAllianceByBooking(selectedBookingForEdit.allianceId)?.name || 'Unknown'} 
+                            {getAllianceByBooking(selectedBookingForEdit.allianceId)?.tag ? ` [${getAllianceByBooking(selectedBookingForEdit.allianceId)?.tag}]` : ''}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 uppercase tracking-wider text-[10px]">Priority score / speedups</p>
+                          <p className="text-cyan-400 font-bold mt-1">
+                            {selectedBookingForEdit.score.toLocaleString()} DP ({selectedBookingForEdit.speedupDays}d {selectedBookingForEdit.speedupHours}h)
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 uppercase tracking-wider text-[10px]">Target Reservation Slot</p>
+                          <p className="text-emerald-400 font-bold mt-1 capitalize">
+                            {selectedBookingForEdit.eventType} @ {selectedBookingForEdit.slotId}
+                          </p>
+                        </div>
+                        {selectedBookingForEdit.discordUsername && (
+                          <div className="sm:col-span-3 border-t border-slate-850 pt-2.5 mt-1 flex items-center gap-1.5 text-slate-400">
+                            <span className="text-[10px] text-slate-500 uppercase font-bold">Discord Contact:</span>
+                            <span>@{selectedBookingForEdit.discordUsername}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

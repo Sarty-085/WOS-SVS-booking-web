@@ -21,7 +21,7 @@ export default function LandingPage({ onNavigate, onBookDay }: LandingPageProps)
     },
     {
       question: "Can I edit or cancel my slots?",
-      answer: "Yes. Within the Royal Schedule portal, operators or verified system administrators have clearance codes to rearrange, rename, delete, or override booking slots to preserve state cohesion."
+      answer: "Yes. Within the Prep Booking Schedule portal, operators or verified system administrators have clearance codes to rearrange, rename, delete, or override booking slots to preserve state cohesion."
     }
   ];
 
@@ -42,9 +42,9 @@ export default function LandingPage({ onNavigate, onBookDay }: LandingPageProps)
               transition={{ duration: 0.7, delay: 0.1 }}
               className="font-heading text-4xl sm:text-5xl md:text-6xl font-black text-white leading-tight tracking-tight mb-6"
             >
-              Your Aid To <br />
+              Mark Your Spot and <br />
               <span className="text-silver-cyan">
-                The Supreme Presidency
+                Dominate The Leaderboard!
               </span>
             </motion.h1>
 

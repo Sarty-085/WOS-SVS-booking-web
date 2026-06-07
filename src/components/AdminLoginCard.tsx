@@ -59,7 +59,7 @@ export default function AdminLoginCard({ onLoginSuccess, onBypass }: AdminLoginC
           </div>
           
           <h2 className="font-heading text-2xl font-black text-white tracking-wider glow-cyan-active px-3 py-1 bg-cyan-950/25 border border-cyan-500/10 rounded-lg">
-            Royal <span className="text-silver-cyan">Slots</span>
+            Prep <span className="text-silver-cyan">Booking</span>
           </h2>
           <p className="text-xs text-sky-400 font-mono tracking-widest mt-2 uppercase">
             Management Authority Access

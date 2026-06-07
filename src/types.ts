@@ -12,6 +12,7 @@ export interface Booking {
   playerName: string;
   userId: string;
   email: string;
+  discordUsername?: string;
   allianceId: string; // references Alliance
   eventType: EventType;
   speedupDays: number;
@@ -21,6 +22,7 @@ export interface Booking {
   backupSlots: string[]; // Backup slots
   autoAssign: boolean;
   timestamp: string;
+  week?: string;
 }
 
 export type SlotStatus = 'available' | 'booked' | 'locked';
