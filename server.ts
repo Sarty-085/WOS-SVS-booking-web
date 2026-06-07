@@ -22,6 +22,24 @@ const pool = new Pool({
 });
 
 /**
+ * Retrieve a valid fallback state ID dynamically if not specified or missing
+ */
+async function getFallbackStateId(stateId?: string): Promise<string> {
+  if (stateId && stateId.trim()) {
+    return stateId;
+  }
+  try {
+    const res = await pool.query("SELECT id FROM states LIMIT 1");
+    if (res.rows.length > 0) {
+      return res.rows[0].id;
+    }
+  } catch (err) {
+    console.error("Error retrieving fallback state ID:", err);
+  }
+  return 'st-1085';
+}
+
+/**
  * Perform server-side synchronization of PostgreSQL bookings to Google Sheets
  */
 async function syncPostgresToGoogleSheets(stateId?: string): Promise<{ success: boolean; message: string; email?: string }> {
@@ -1816,7 +1834,7 @@ async function startServer() {
   app.post('/api/alliances', async (req, res) => {
     try {
       const { id, name, tag, color, stateId } = req.body;
-      const fStateId = stateId || 'st-1085';
+      const fStateId = await getFallbackStateId(stateId);
       await pool.query(
         "INSERT INTO alliances (id, name, tag, color, state_id) VALUES ($1, $2, $3, $4, $5)",
         [id, name, tag, color, fStateId]
@@ -1824,6 +1842,7 @@ async function startServer() {
       triggerQuietBackgroundSync(fStateId);
       res.json({ success: true });
     } catch (err: any) {
+      console.error("Error saving new alliance to DB:", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -2061,7 +2080,7 @@ async function startServer() {
   app.post('/api/bookings', async (req, res) => {
     try {
       const { id, playerName, userId, email, discordUsername, allianceId, eventType, speedupDays, speedupHours, score, slotId, backupSlots, autoAssign, timestamp, week, stateId } = req.body;
-      const activeState = stateId || 'st-1085';
+      const activeState = await getFallbackStateId(stateId);
       
       const beforeBookings = await fetchCurrentBookingsFromDb(activeState);
 
@@ -2091,6 +2110,7 @@ async function startServer() {
 
       res.json({ success: true });
     } catch (err: any) {
+      console.error("Error saving booking to DB:", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -2189,13 +2209,14 @@ async function startServer() {
   app.post('/api/audit-logs', async (req, res) => {
     try {
       const { id, operator, action, details, timestamp, stateId } = req.body;
-      const activeState = stateId || 'st-1085';
+      const activeState = await getFallbackStateId(stateId);
       await pool.query(
         "INSERT INTO audit_logs (id, operator, action, details, timestamp, state_id) VALUES ($1, $2, $3, $4, $5, $6)",
         [id, operator, action, details, timestamp, activeState]
       );
       res.json({ success: true });
     } catch (err: any) {
+      console.error("Error saving audit log in DB:", err);
       res.status(500).json({ error: err.message });
     }
   });

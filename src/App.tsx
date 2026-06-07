@@ -258,11 +258,12 @@ export default function App() {
       return;
     }
 
-    const newAll: Alliance = {
+    const newAll = {
       id: `all-${Date.now()}`,
       name,
       tag: tag.toUpperCase(),
-      color
+      color,
+      stateId: selectedState?.id
     };
 
     try {
@@ -281,7 +282,7 @@ export default function App() {
         const alls = await alliancesRes.json();
         setAlliances(alls);
       } else {
-        setAlliances([...alliances, newAll]);
+        setAlliances([...alliances, { id: newAll.id, name: newAll.name, tag: newAll.tag, color: newAll.color }]);
       }
 
       addAuditLog(
@@ -300,15 +301,19 @@ export default function App() {
     const newBooking: Booking = {
       id: `book-${Date.now()}`,
       ...bookingData,
+      stateId: selectedState?.id || undefined,
       timestamp: new Date().toISOString()
     };
 
     try {
-      await fetch('/api/bookings', {
+      const response = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newBooking)
       });
+      if (!response.ok) {
+        throw new Error("HTTP connection error adding booking");
+      }
       const updated = [...bookings, newBooking];
       setBookings(updated);
 
@@ -319,6 +324,7 @@ export default function App() {
       );
     } catch (err) {
       console.error(err);
+      alert("Error saving booking. Please try again.");
     }
   };
 
