@@ -3,7 +3,7 @@ import { ShieldCheck, User, Lock, Eye, EyeOff, Terminal, KeyRound } from 'lucide
 import { motion } from 'motion/react';
 
 interface AdminLoginCardProps {
-  onLoginSuccess: (username: string) => void;
+  onLoginSuccess: (username: string, roleLevel: 'root' | 'state_admin', assignedStateId: string | null, token: string) => void;
   onBypass?: () => void;
 }
 
@@ -14,7 +14,7 @@ export default function AdminLoginCard({ onLoginSuccess, onBypass }: AdminLoginC
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -29,15 +29,36 @@ export default function AdminLoginCard({ onLoginSuccess, onBypass }: AdminLoginC
 
     setLoading(true);
 
-    // Simulate connection delay for premium terminal vibe
-    setTimeout(() => {
-      if (identifier.toLowerCase() === 'admin' && clearanceCode === '1337') {
-        onLoginSuccess(identifier);
-      } else {
-        setErrorMsg('SECURE COCKPIT DENIED: Invalid identifier or clearance key.');
+    try {
+      const response = await fetch('/api/admins/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: identifier.trim(),
+          password: clearanceCode
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        setErrorMsg(data.error || 'SECURE CONNECT DENIED: Invalid administrative credentials.');
+        setLoading(false);
+        return;
       }
+
+      onLoginSuccess(
+        data.admin.username,
+        data.admin.roleLevel,
+        data.admin.assignedStateId,
+        data.token
+      );
+    } catch (err: any) {
+      setErrorMsg('CONNECTION ERROR: Key server unreachable or responding incorrectly.');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (

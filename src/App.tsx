@@ -7,7 +7,7 @@ import {
   INITIAL_ALLIANCES, INITIAL_BOOKINGS, INITIAL_AUDIT_LOGS, 
   loadDailySlots, generateEmptySlots, CAMPAIGN_WEEKS 
 } from './dataStore';
-import { Alliance, Booking, Slot, AuditLog, EventType } from './types';
+import { Alliance, Booking, Slot, AuditLog, EventType, StateEntity, AdminSession } from './types';
 import LandingPage from './components/LandingPage';
 import TitleBookingForm from './components/TitleBookingForm';
 import AdminLoginCard from './components/AdminLoginCard';
@@ -21,6 +21,25 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<NavigationTab>('Landing');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Multi-State partitioned tracking
+  const [states, setStates] = useState<StateEntity[]>([]);
+  const [selectedState, setSelectedState] = useState<StateEntity | null>(() => {
+    const saved = localStorage.getItem('royal_slots_selected_state');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return null; }
+    }
+    return null;
+  });
+
+  // Admin authentication states
+  const [adminSession, setAdminSession] = useState<AdminSession | null>(() => {
+    const saved = localStorage.getItem('royal_slots_admin_session');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return null; }
+    }
+    return null;
+  });
+
   // Core Database States
   const [alliances, setAlliances] = useState<Alliance[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -30,7 +49,7 @@ export default function App() {
   // Selected Event Scheduling day (Monday by default)
   const [selectedDay, setSelectedDay] = useState<EventType>('monday');
 
-  // Admin authentication states
+  // Admin state fields compatibility variables
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminUsername, setAdminUsername] = useState('admin');
 
@@ -39,9 +58,53 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [demoBannerOpen, setDemoBannerOpen] = useState(true);
 
-  // Initialize and load from API / Neon PostgreSQL
+  // Fetch available multi-state partitions on startup
   useEffect(() => {
-    const fetchAllData = async () => {
+    const fetchStates = async () => {
+      try {
+        const res = await fetch('/api/states');
+        if (res.ok) {
+          const list: StateEntity[] = await res.json();
+          setStates(list);
+
+          // Restore or select default state
+          const savedStr = localStorage.getItem('royal_slots_selected_state');
+          let parsed: StateEntity | null = null;
+          if (savedStr) {
+            try { parsed = JSON.parse(savedStr); } catch (e) {}
+          }
+
+          if (parsed) {
+            const exists = list.find(s => s.id === parsed.id);
+            if (exists) {
+              setSelectedState(exists);
+              localStorage.setItem('royal_slots_selected_state', JSON.stringify(exists));
+            } else {
+              setSelectedState(null);
+              localStorage.removeItem('royal_slots_selected_state');
+            }
+          } else {
+            setSelectedState(null);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load states:", err);
+      }
+    };
+    fetchStates();
+
+    // Load admin session state
+    const savedAdminAuth = localStorage.getItem('royal_slots_admin_auth');
+    if (savedAdminAuth === 'true' && adminSession) {
+      setIsAdmin(true);
+      setAdminUsername(adminSession.username);
+    }
+  }, []);
+
+  // Fetch state-specific data whenever selection pivots
+  useEffect(() => {
+    const fetchStateData = async () => {
+      if (!selectedState) return;
       try {
         const alliancesRes = await fetch('/api/alliances');
         if (alliancesRes.ok) {
@@ -49,13 +112,13 @@ export default function App() {
           setAlliances(alls);
         }
 
-        const bookingsRes = await fetch('/api/bookings');
+        const bookingsRes = await fetch(`/api/bookings?stateId=${selectedState.id}`);
         if (bookingsRes.ok) {
           const bks = await bookingsRes.json();
           setBookings(bks);
         }
 
-        const auditRes = await fetch('/api/audit-logs');
+        const auditRes = await fetch(`/api/audit-logs?stateId=${selectedState.id}`);
         if (auditRes.ok) {
           const logs = await auditRes.json();
           setAuditLogs(logs);
@@ -70,19 +133,11 @@ export default function App() {
           }
         }
       } catch (e) {
-        console.error("Error loading data from API:", e);
+        console.error("Error loading state filtered data:", e);
       }
     };
-    fetchAllData();
-
-    // Admin state
-    const savedAdminAuth = localStorage.getItem('royal_slots_admin_auth');
-    if (savedAdminAuth === 'true') {
-      setIsAdmin(true);
-      const savedUser = localStorage.getItem('royal_slots_admin_user') || 'admin';
-      setAdminUsername(savedUser);
-    }
-  }, []);
+    fetchStateData();
+  }, [selectedState]);
 
   // Change active reservation week in database
   const handleChangeActiveWeek = async (newWeek: string) => {
@@ -330,25 +385,128 @@ export default function App() {
     }
   };
 
+  // Multi-State Partition Registration and Management Actions
+  const handleAddState = async (stateNumber: string) => {
+    try {
+      const res = await fetch('/api/states', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adminSession?.token ? { 'Authorization': `Bearer ${adminSession.token}` } : {})
+        },
+        body: JSON.stringify({ stateNumber })
+      });
+      if (res.ok) {
+        const newState = await res.json();
+        setStates(prev => [...prev, newState]);
+        if (!selectedState) {
+          setSelectedState(newState);
+          localStorage.setItem('royal_slots_selected_state', JSON.stringify(newState));
+        }
+        alert(`Successfully registered State ${stateNumber} partition boundaries.`);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Failed to register State partition.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error registering state partition.");
+    }
+  };
+
+  const handleDeleteState = async (id: string) => {
+    if (!confirm("Are you sure you want to permanently purge this State partition? All associated alliances, bookings, and sync credentials will be destroyed!")) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/states/${id}`, {
+        method: 'DELETE',
+        headers: {
+          ...(adminSession?.token ? { 'Authorization': `Bearer ${adminSession.token}` } : {})
+        }
+      });
+      if (res.ok) {
+        setStates(prev => {
+          const updated = prev.filter(s => s.id !== id);
+          if (selectedState?.id === id) {
+            if (updated.length > 0) {
+              const fallback = updated.find(s => s.state_number === '1085') || updated[0];
+              setSelectedState(fallback);
+              localStorage.setItem('royal_slots_selected_state', JSON.stringify(fallback));
+            } else {
+              setSelectedState(null);
+              localStorage.removeItem('royal_slots_selected_state');
+            }
+          }
+          return updated;
+        });
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || "Failed to purge database state partition.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Error purging state partition: " + err.message);
+    }
+  };
+
+  const handleUpdateStateGoogleSheets = async (id: string, spreadsheetId: string, sheetName: string) => {
+    try {
+      const res = await fetch(`/api/states/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adminSession?.token ? { 'Authorization': `Bearer ${adminSession.token}` } : {})
+        },
+        body: JSON.stringify({ googleSpreadsheetId: spreadsheetId, googleSheetName: sheetName })
+      });
+      if (res.ok) {
+        setStates(prev => prev.map(s => s.id === id ? { ...s, google_spreadsheet_id: spreadsheetId, google_sheet_name: sheetName } : s));
+        if (selectedState?.id === id) {
+          const updatedState = { ...selectedState, google_spreadsheet_id: spreadsheetId, google_sheet_name: sheetName };
+          setSelectedState(updatedState);
+          localStorage.setItem('royal_slots_selected_state', JSON.stringify(updatedState));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Admin Session Management
-  const handleAdminLogin = (username: string) => {
+  const handleAdminLogin = (username: string, roleLevel: 'root' | 'state_admin' = 'state_admin', assignedStateId: string | null = null, token?: string) => {
     setIsAdmin(true);
     setAdminUsername(username);
+    const sessionObj: AdminSession = { isAuthenticated: true, username, roleLevel, assignedStateId, token };
+    setAdminSession(sessionObj);
+    localStorage.setItem('royal_slots_admin_session', JSON.stringify(sessionObj));
     localStorage.setItem('royal_slots_admin_auth', 'true');
     localStorage.setItem('royal_slots_admin_user', username);
+
+    // If restricted state-boundary admin is mapping, force focus selection
+    if (roleLevel === 'state_admin' && assignedStateId) {
+      const assigned = states.find(s => s.id === assignedStateId);
+      if (assigned) {
+        setSelectedState(assigned);
+        localStorage.setItem('royal_slots_selected_state', JSON.stringify(assigned));
+      }
+    }
+
     setActiveTab('Schedule'); // Slide right to the scheduler dashboard on sign-in
-    addAuditLog(username, 'slot_lock', `Clearance authenticated. Session established on terminal host.`);
+    addAuditLog(username, 'slot_lock', `Clearance authenticated as ${roleLevel.toUpperCase()}. Session established on terminal host.`);
   };
 
   const handleAdminLogout = () => {
     addAuditLog(adminUsername, 'slot_unlock', `Session terminated. Clearance revoked from terminal host.`);
     setIsAdmin(false);
+    setAdminSession(null);
+    localStorage.removeItem('royal_slots_admin_session');
     localStorage.setItem('royal_slots_admin_auth', 'false');
     setActiveTab('Landing');
   };
 
   const handleBypassAuth = () => {
-    handleAdminLogin('Sarthak_Admin');
+    handleAdminLogin('Sarthak_Admin', 'root', null, 'bypass_token');
   };
 
   // Compute live slots list for rendering based on current selectedDay and bookings of the active week only
@@ -395,26 +553,30 @@ export default function App() {
             >
               Landing
             </button>
-            <button
-              onClick={() => setActiveTab('Reservations')}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase font-heading transition-all ${
-                activeTab === 'Reservations' 
-                  ? 'text-cyan-400 font-black border-b border-cyan-400 py-1' 
-                  : 'text-slate-400 hover:text-cyan-400'
-              }`}
-            >
-              Reservations
-            </button>
-            <button
-              onClick={() => setActiveTab('Schedule')}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase font-heading transition-all ${
-                activeTab === 'Schedule' 
-                  ? 'text-cyan-400 font-black border-b border-cyan-400 py-1' 
-                  : 'text-slate-400 hover:text-cyan-400'
-              }`}
-            >
-              Schedule
-            </button>
+            {selectedState && (
+              <>
+                <button
+                  onClick={() => setActiveTab('Reservations')}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase font-heading transition-all ${
+                    activeTab === 'Reservations' 
+                      ? 'text-cyan-400 font-black border-b border-cyan-400 py-1' 
+                      : 'text-slate-400 hover:text-cyan-400'
+                  }`}
+                >
+                  Reservations
+                </button>
+                <button
+                  onClick={() => setActiveTab('Schedule')}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase font-heading transition-all ${
+                    activeTab === 'Schedule' 
+                      ? 'text-cyan-400 font-black border-b border-cyan-400 py-1' 
+                      : 'text-slate-400 hover:text-cyan-400'
+                  }`}
+                >
+                  Schedule
+                </button>
+              </>
+            )}
             <button
               onClick={() => setActiveTab('Admin')}
               className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase font-heading transition-all flex items-center gap-1.5 ${
@@ -492,18 +654,22 @@ export default function App() {
             >
               Landing Base
             </button>
-            <button
-              onClick={() => { setActiveTab('Reservations'); setMobileMenuOpen(false); }}
-              className={`py-2 px-3 text-sm font-semibold rounded ${activeTab === 'Reservations' ? 'bg-sky-950/60 text-sky-450 font-bold' : 'text-slate-400'}`}
-            >
-              Reservations Form
-            </button>
-            <button
-              onClick={() => { setActiveTab('Schedule'); setMobileMenuOpen(false); }}
-              className={`py-2 px-3 text-sm font-semibold rounded ${activeTab === 'Schedule' ? 'bg-sky-950/60 text-sky-450 font-bold' : 'text-slate-400'}`}
-            >
-              Scheduling Grid
-            </button>
+            {selectedState && (
+              <>
+                <button
+                  onClick={() => { setActiveTab('Reservations'); setMobileMenuOpen(false); }}
+                  className={`py-2 px-3 text-sm font-semibold rounded ${activeTab === 'Reservations' ? 'bg-sky-950/60 text-sky-450 font-bold' : 'text-slate-400'}`}
+                >
+                  Reservations Form
+                </button>
+                <button
+                  onClick={() => { setActiveTab('Schedule'); setMobileMenuOpen(false); }}
+                  className={`py-2 px-3 text-sm font-semibold rounded ${activeTab === 'Schedule' ? 'bg-sky-950/60 text-sky-450 font-bold' : 'text-slate-400'}`}
+                >
+                  Scheduling Grid
+                </button>
+              </>
+            )}
             <button
               onClick={() => { setActiveTab('Admin'); setMobileMenuOpen(false); }}
               className={`py-2 px-3 text-sm font-semibold rounded flex items-center gap-2 ${activeTab === 'Admin' ? 'bg-sky-950/60 text-sky-450' : 'text-slate-400'}`}
@@ -535,7 +701,17 @@ export default function App() {
               exit={{ opacity: 0, x: 10 }}
               transition={{ duration: 0.3 }}
             >
-              <LandingPage onNavigate={setActiveTab} onBookDay={handleBookDayDirect} />
+              <LandingPage 
+                onNavigate={setActiveTab} 
+                onBookDay={handleBookDayDirect}
+                states={states}
+                selectedState={selectedState}
+                onSelectState={(st) => {
+                  setSelectedState(st);
+                  localStorage.setItem('royal_slots_selected_state', JSON.stringify(st));
+                }}
+                onAddState={handleAddState}
+              />
             </motion.div>
           )}
 
@@ -575,6 +751,12 @@ export default function App() {
                 selectedDay={selectedDay}
                 isAdmin={isAdmin}
                 adminUsername={adminUsername}
+                adminSession={adminSession}
+                states={states}
+                selectedState={selectedState}
+                onAddState={handleAddState}
+                onUpdateStateGoogleSheets={handleUpdateStateGoogleSheets}
+                onDeleteState={handleDeleteState}
                 activeWeek={activeWeek}
                 onChangeActiveWeek={handleChangeActiveWeek}
                 onSetSelectedDay={setSelectedDay}

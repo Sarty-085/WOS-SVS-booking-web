@@ -1,3 +1,10 @@
+export interface StateEntity {
+  id: string;
+  state_number: string;
+  google_spreadsheet_id?: string;
+  google_sheet_name?: string;
+}
+
 export interface Alliance {
   id: string;
   name: string;
@@ -23,6 +30,7 @@ export interface Booking {
   autoAssign: boolean;
   timestamp: string;
   week?: string;
+  stateId?: string;
 }
 
 export type SlotStatus = 'available' | 'booked' | 'locked';
@@ -38,12 +46,16 @@ export interface Slot {
 export interface AuditLog {
   id: string;
   operator: string;
-  action: 'create_booking' | 'delete_booking' | 'edit_booking' | 'create_alliance' | 'edit_alliance' | 'delete_alliance' | 'slot_lock' | 'slot_unlock';
+  action: string;
   details: string;
   timestamp: string;
+  state_id?: string;
 }
 
 export interface AdminSession {
   isAuthenticated: boolean;
   username: string;
+  roleLevel?: 'root' | 'state_admin';
+  assignedStateId?: string | null;
+  token?: string;
 }

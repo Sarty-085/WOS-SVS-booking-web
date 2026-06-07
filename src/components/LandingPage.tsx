@@ -1,14 +1,30 @@
 import React, { useState } from 'react';
-import { ArrowRight, Calendar, Info, Clock, Play, HelpCircle, ChevronRight, Sparkles, Star, ShieldAlert } from 'lucide-react';
+import { ArrowRight, Calendar, Info, Clock, Play, HelpCircle, ChevronRight, Sparkles, Star, ShieldAlert, MapPin, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { StateEntity } from '../types';
 
 interface LandingPageProps {
   onNavigate: (page: string) => void;
   onBookDay: (day: 'monday' | 'tuesday' | 'thursday') => void;
+  states: StateEntity[];
+  selectedState: StateEntity | null;
+  onSelectState: (state: StateEntity) => void;
+  onAddState: (stateNumber: string) => Promise<void>;
 }
 
-export default function LandingPage({ onNavigate, onBookDay }: LandingPageProps) {
+export default function LandingPage({ 
+  onNavigate, 
+  onBookDay,
+  states = [],
+  selectedState = null,
+  onSelectState,
+  onAddState
+}: LandingPageProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  
+  // Local form for adding a new state
+  const [newStateNum, setNewStateNum] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const faqs = [
     {
@@ -25,6 +41,92 @@ export default function LandingPage({ onNavigate, onBookDay }: LandingPageProps)
     }
   ];
 
+  if (!selectedState) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center px-4 relative bg-[#020617]">
+        {/* Decorative glows */}
+        <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md glass-panel-heavy p-8 rounded-3xl border border-slate-800 text-center shadow-[0_0_50px_rgba(6,182,212,0.06)] relative z-10 text-slate-200"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-cyan-950/80 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto mb-6 shadow-[0_0_20px_rgba(6,182,212,0.15)]">
+            <MapPin className="w-8 h-8" />
+          </div>
+
+          <h2 className="font-heading font-black text-2xl text-white tracking-tight mb-2">Select Your State</h2>
+          <p className="text-sm text-slate-400 leading-relaxed mb-6">
+            Welcome to the Multi-State Esports Scheduler. Enter your server partition or choose from active kingdoms below.
+          </p>
+
+          {/* Active States Selection Group */}
+          <div className="space-y-2.5 max-h-[160px] overflow-y-auto mb-6 pr-1 text-left">
+            <span className="text-[10px] font-mono text-slate-500 font-bold tracking-wider block uppercase">ACTIVE KINGDOMS</span>
+            {states.map((st) => (
+              <button
+                key={st.id}
+                onClick={() => onSelectState(st)}
+                className="w-full p-3 rounded-xl border border-slate-800/80 bg-slate-900/20 hover:bg-slate-900/60 text-slate-250 hover:text-white flex items-center justify-between transition-all group hover:border-cyan-500/30 font-semibold text-sm cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-cyan-500 group-hover:animate-bounce" />
+                  <span>State {st.state_number}</span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-500 group-hover:text-cyan-400">CONNECT &rarr;</span>
+              </button>
+            ))}
+            {states.length === 0 && (
+              <div className="p-4 text-center text-xs italic text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                No active state partitions found. Initiate a new one below!
+              </div>
+            )}
+          </div>
+
+          {/* Fast On-The-Fly State Initialization */}
+          <div className="border-t border-slate-900 pt-5">
+            <span className="text-[10px] font-mono text-slate-500 font-bold tracking-wider block uppercase text-left mb-2.5">REGISTER NEW STATE SERVER</span>
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const trimmed = newStateNum.trim();
+                if (!trimmed) return;
+                setIsRegistering(true);
+                try {
+                  await onAddState(trimmed);
+                  setNewStateNum('');
+                } catch (e) {}
+                setIsRegistering(false);
+              }}
+              className="flex items-center gap-2"
+            >
+              <div className="relative flex-1">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] font-mono font-bold text-slate-500">STATE</span>
+                <input
+                  type="number"
+                  placeholder="E.g. 1127"
+                  value={newStateNum}
+                  onChange={(e) => setNewStateNum(e.target.value)}
+                  className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl pl-16 pr-3 py-2 text-xs text-white outline-none transition-colors"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isRegistering}
+                className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)] flex items-center justify-center cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen">
       {/* Hero Section */}
@@ -34,8 +136,31 @@ export default function LandingPage({ onNavigate, onBookDay }: LandingPageProps)
         <div className="absolute top-1/2 right-10 w-[250px] md:w-[450px] h-[250px] md:h-[450px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          {/* Hero Left Column */}
+           {/* Hero Left Column */}
           <div className="lg:col-span-7 flex flex-col items-start text-left z-10">
+            {selectedState && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/30 text-cyan-400 font-mono text-[11px] font-bold tracking-wide mb-6"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>CONNECTED: STATE {selectedState.state_number}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <button 
+                  onClick={() => {
+                    if (confirm(`Disconnect and swap State ${selectedState.state_number} for another State server partition?`)) {
+                      localStorage.removeItem('royal_slots_selected_state');
+                      window.location.reload();
+                    }
+                  }}
+                  className="hover:underline text-slate-450 hover:text-white ml-2 cursor-pointer font-bold"
+                >
+                  (CHANGE)
+                </button>
+              </motion.div>
+            )}
+
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

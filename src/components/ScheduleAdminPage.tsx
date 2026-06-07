@@ -4,7 +4,7 @@ import {
   Trash2, Edit, Check, RefreshCw, Layers, Sparkles, LogOut, Clock, Play, MapPin, CheckCircle,
   Bot, MessageSquare
 } from 'lucide-react';
-import { Alliance, Booking, Slot, AuditLog, EventType, SlotStatus } from '../types';
+import { Alliance, Booking, Slot, AuditLog, EventType, SlotStatus, AdminSession, StateEntity } from '../types';
 import { loadDailySlots, CAMPAIGN_WEEKS } from '../dataStore';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -16,6 +16,12 @@ interface ScheduleAdminPageProps {
   selectedDay: EventType;
   isAdmin: boolean;
   adminUsername: string;
+  adminSession?: AdminSession | null;
+  states?: StateEntity[];
+  selectedState?: StateEntity | null;
+  onAddState?: (stateNumber: string) => Promise<void>;
+  onUpdateStateGoogleSheets?: (id: string, spreadsheetId: string, sheetName: string) => Promise<void>;
+  onDeleteState?: (id: string) => Promise<void>;
   activeWeek: string;
   onChangeActiveWeek: (week: string) => void;
   onSetSelectedDay: (day: EventType) => void;
@@ -28,7 +34,7 @@ interface ScheduleAdminPageProps {
   onAddBooking: (booking: Omit<Booking, 'id' | 'timestamp'>) => void;
 }
 
-type AdminTab = 'Dashboard' | 'Bookings' | 'Audit Logs' | 'Google Sheets Sync' | 'Alliances' | 'Weeks';
+type AdminTab = 'Dashboard' | 'Bookings' | 'Audit Logs' | 'Google Sheets Sync' | 'Alliances' | 'Weeks' | 'States & Admins';
 
 export default function ScheduleAdminPage({
   alliances,
@@ -38,6 +44,12 @@ export default function ScheduleAdminPage({
   selectedDay,
   isAdmin,
   adminUsername,
+  adminSession,
+  states = [],
+  selectedState = null,
+  onAddState,
+  onUpdateStateGoogleSheets,
+  onDeleteState,
   activeWeek,
   onChangeActiveWeek,
   onSetSelectedDay,
@@ -56,6 +68,7 @@ export default function ScheduleAdminPage({
 
   // Service Account settings state
   const [googleSpreadsheetId, setGoogleSpreadsheetId] = useState('');
+  const [googleSheetName, setGoogleSheetName] = useState('Sheet1');
   const [googleSaJson, setGoogleSaJson] = useState('');
   const [isSaConfigured, setIsSaConfigured] = useState(false);
   const [saEmail, setSaEmail] = useState<string | null>(null);
@@ -77,13 +90,25 @@ export default function ScheduleAdminPage({
   const [isDiscordConfigured, setIsDiscordConfigured] = useState(false);
   const [showDiscordTokenInput, setShowDiscordTokenInput] = useState(false);
 
+  // States & sub-admins list
+  const [adminsList, setAdminsList] = useState<any[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+
+  // Create sub-admin variables
+  const [newAdminUser, setNewAdminUser] = useState('');
+  const [newAdminPass, setNewAdminPass] = useState('');
+  const [newAdminState, setNewAdminState] = useState('');
+  const [errAdminCreate, setErrAdminCreate] = useState('');
+
   // Fetch setup details from the background API
   const fetchSheetsStats = async () => {
     try {
-      const res = await fetch('/api/google-sheets/stats');
+      const url = selectedState ? `/api/google-sheets/stats?stateId=${selectedState.id}` : '/api/google-sheets/stats';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setGoogleSpreadsheetId(data.spreadsheetId || '');
+        setGoogleSheetName(data.sheetName || 'Sheet1');
         setIsSaConfigured(data.isConfigured || false);
         setSaEmail(data.serviceAccountEmail || null);
         setAdminNotificationEmail(data.adminNotificationEmail || '');
@@ -99,98 +124,212 @@ export default function ScheduleAdminPage({
     }
   };
 
+  const fetchAdmins = async () => {
+    if (adminSession?.roleLevel !== 'root') return;
+    setLoadingAdmins(true);
+    try {
+      const res = await fetch('/api/admins/list', {
+        headers: {
+          'Authorization': `Bearer ${adminSession?.token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminsList(data);
+      }
+    } catch (e) {
+      console.error("Error loading admins:", e);
+    } finally {
+      setLoadingAdmins(false);
+    }
+  };
+
   useEffect(() => {
     if (isAdmin) {
       fetchSheetsStats();
     }
-  }, [isAdmin]);
+  }, [isAdmin, selectedState]);
+
+  useEffect(() => {
+    if (activeAdminTab === 'States & Admins' && adminSession?.roleLevel === 'root') {
+      fetchAdmins();
+    }
+  }, [activeAdminTab, adminSession]);
+
+  const handleCreateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrAdminCreate('');
+    if (!newAdminUser.trim() || !newAdminPass || !newAdminState) {
+      setErrAdminCreate('All fields are required.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/admins/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminSession?.token}`
+        },
+        body: JSON.stringify({
+          username: newAdminUser.trim(),
+          password: newAdminPass,
+          assignedStateId: newAdminState,
+          roleLevel: 'state_admin'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrAdminCreate(data.error || 'Failed to elevate officer clearance.');
+        return;
+      }
+      setNewAdminUser('');
+      setNewAdminPass('');
+      fetchAdmins();
+    } catch (err: any) {
+      setErrAdminCreate(err.message);
+    }
+  };
+
+  const handleDeleteAdmin = async (usernameToDelete: string) => {
+    if (usernameToDelete === 'DEAD') {
+      alert("The root supervisor DEAD can never be removed from system clearance.");
+      return;
+    }
+    if (!confirm(`Are you sure you want to revoke system clearance for target "${usernameToDelete}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admins/${encodeURIComponent(usernameToDelete)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${adminSession?.token}`
+        }
+      });
+      if (res.ok) {
+        fetchAdmins();
+      } else {
+        const error = await res.json();
+        alert(error.error || "Failed to remove admin clearance.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Network error: " + err.message);
+    }
+  };
 
   const handleSaveSheetsSettings = async () => {
     setIsSyncing(true);
     setSyncStatusMsg("Saving settings to PostgreSQL database...");
-    try {
-      // 1. Save spreadsheet ID
-      await fetch('/api/settings/google_spreadsheet_id', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: googleSpreadsheetId.trim() })
-      });
+    
+    // Header for Authorization
+    const authHeaders: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (adminSession?.token) {
+      authHeaders['Authorization'] = `Bearer ${adminSession.token}`;
+    }
 
-      // 2. Save JSON key if provided
-      if (googleSaJson.trim()) {
-        try {
-          JSON.parse(googleSaJson);
-        } catch (e: any) {
-          alert("Malformed JSON structure! Please verify you copied the entire Google Service Account Credentials JSON key. \n\nDetails: " + e.message);
-          setIsSyncing(false);
-          setSyncStatusMsg("");
-          return;
+    try {
+      // 1. If we are state boundary admin OR root targeting a state, save state-specific properties first:
+      if (selectedState) {
+        const responseState = await fetch(`/api/states/${selectedState.id}`, {
+          method: 'PUT',
+          headers: authHeaders,
+          body: JSON.stringify({
+            googleSpreadsheetId: googleSpreadsheetId.trim(),
+            googleSheetName: googleSheetName.trim()
+          })
+        });
+        if (!responseState.ok) {
+          throw new Error("Failed to save state-level spreadsheet settings.");
+        }
+      }
+
+      // 2. Clear credentials only if role is root:
+      if (adminSession?.roleLevel === 'root') {
+        // Save global spreadsheet placeholder (fallback)
+        await fetch('/api/settings/google_spreadsheet_id', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ value: googleSpreadsheetId.trim() })
+        });
+
+        // Save JSON key if provided
+        if (googleSaJson.trim()) {
+          try {
+            JSON.parse(googleSaJson);
+          } catch (e: any) {
+            alert("Malformed JSON structure! Please verify you copied the entire Google Service Account Credentials JSON key. \n\nDetails: " + e.message);
+            setIsSyncing(false);
+            setSyncStatusMsg("");
+            return;
+          }
+
+          await fetch('/api/settings/google_service_account_json', {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ value: googleSaJson.trim() })
+          });
+          setGoogleSaJson('');
+          setShowJsonInput(false);
         }
 
-        await fetch('/api/settings/google_service_account_json', {
+        // Save admin notification email
+        await fetch('/api/settings/admin_notification_email', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: googleSaJson.trim() })
+          headers: authHeaders,
+          body: JSON.stringify({ value: (adminNotificationEmail || '').trim() })
         });
-        setGoogleSaJson('');
-        setShowJsonInput(false);
-      }
 
-      // 3. Save admin notification email
-      await fetch('/api/settings/admin_notification_email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: (adminNotificationEmail || '').trim() })
-      });
-
-      // 4. Save SMTP server settings
-      await fetch('/api/settings/smtp_host', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: (smtpHost || '').trim() })
-      });
-
-      await fetch('/api/settings/smtp_port', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: (smtpPort || '').trim() })
-      });
-
-      await fetch('/api/settings/smtp_user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: (smtpUser || '').trim() })
-      });
-
-      await fetch('/api/settings/smtp_from', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: (smtpFrom || '').trim() })
-      });
-
-      if (smtpPass.trim()) {
-        await fetch('/api/settings/smtp_pass', {
+        // Save SMTP server settings
+        await fetch('/api/settings/smtp_host', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: smtpPass.trim() })
+          headers: authHeaders,
+          body: JSON.stringify({ value: (smtpHost || '').trim() })
         });
-        setSmtpPass('');
-        setShowSmtpPassInput(false);
-      }
 
-      if (discordBotToken.trim()) {
-        await fetch('/api/settings/discord_bot_token', {
+        await fetch('/api/settings/smtp_port', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: discordBotToken.trim() })
+          headers: authHeaders,
+          body: JSON.stringify({ value: (smtpPort || '').trim() })
         });
-        setDiscordBotToken('');
-        setShowDiscordTokenInput(false);
+
+        await fetch('/api/settings/smtp_user', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ value: (smtpUser || '').trim() })
+        });
+
+        await fetch('/api/settings/smtp_from', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ value: (smtpFrom || '').trim() })
+        });
+
+        if (smtpPass.trim()) {
+          await fetch('/api/settings/smtp_pass', {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ value: smtpPass.trim() })
+          });
+          setSmtpPass('');
+          setShowSmtpPassInput(false);
+        }
+
+        if (discordBotToken.trim()) {
+          await fetch('/api/settings/discord_bot_token', {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ value: discordBotToken.trim() })
+          });
+          setDiscordBotToken('');
+          setShowDiscordTokenInput(false);
+        }
       }
 
       await fetchSheetsStats();
-      addAdminAuditLog("Admin", "slot_lock", "Updated background Google Registry Sync, Nodemailer SMTP, and Discord Bot Token parameters.");
-      alert("System Registry & notification configuration saved successfully! If proper Discord or SMTP credentials are set, notifications will trigger.");
+      addAdminAuditLog("Admin", "slot_lock", "Updated background Google Registry Sync and multi-state config mapping.");
+      alert("System Registry boundaries saved successfully!");
       setSyncStatusMsg("Saved successfully!");
     } catch (err: any) {
       alert("Failed storing parameters: " + err.message);
@@ -204,7 +343,8 @@ export default function ScheduleAdminPage({
     setIsSyncing(true);
     setSyncStatusMsg("Triggering server-side Google Sheets Sync agent...");
     try {
-      const res = await fetch('/api/google-sheets/sync', { method: 'POST' });
+      const url = selectedState ? `/api/google-sheets/sync?stateId=${selectedState.id}` : '/api/google-sheets/sync';
+      const res = await fetch(url, { method: 'POST' });
       const data = await res.json();
       if (res.ok && data.success) {
         addAdminAuditLog("Admin", "edit_booking", "Initiated manual server sync registry slots live to Google Sheets.");
@@ -495,8 +635,13 @@ export default function ScheduleAdminPage({
 
             {/* Sidebar menu links with active design requested */}
             <nav className="flex flex-col gap-1 text-left">
-              {(['Dashboard', 'Bookings', 'Audit Logs', 'Google Sheets Sync', 'Alliances', 'Weeks'] as AdminTab[])
-                .filter((t) => isAdmin || t === 'Dashboard' || t === 'Weeks')
+              {(['Dashboard', 'Bookings', 'Audit Logs', 'Google Sheets Sync', 'Alliances', 'Weeks', 'States & Admins'] as AdminTab[])
+                .filter((t) => {
+                  if (t === 'States & Admins') {
+                    return isAdmin && adminSession?.roleLevel === 'root';
+                  }
+                  return isAdmin || t === 'Dashboard' || t === 'Weeks';
+                })
                 .map((tab) => {
                 const isActive = activeAdminTab === tab;
                 let IconComp = BarChart2;
@@ -505,6 +650,7 @@ export default function ScheduleAdminPage({
                 if (tab === 'Google Sheets Sync') IconComp = RefreshCw;
                 if (tab === 'Alliances') IconComp = Users;
                 if (tab === 'Weeks') IconComp = Layers;
+                if (tab === 'States & Admins') IconComp = MapPin;
 
                 return (
                   <button
@@ -1480,6 +1626,19 @@ export default function ScheduleAdminPage({
                     <span className="text-[9px] text-slate-500">Extracted from spreadsheet URL: <code className="text-slate-400">/spreadsheets/d/[SPEADSHEET_ID_HERE]/edit</code></span>
                   </div>
 
+                  {/* Sheet Tab Name Input */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">Google Sheet Tab Name:</label>
+                    <input
+                      type="text"
+                      value={googleSheetName}
+                      onChange={(e) => setGoogleSheetName(e.target.value)}
+                      placeholder="Sheet1"
+                      className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                    />
+                    <span className="text-[9px] text-slate-500">Specify the exact sheet tab name inside your private Google Spreadsheet (defaults to <code className="text-slate-400">Sheet1</code>).</span>
+                  </div>
+
                   {/* Credentials JSON Key */}
                   <div className="flex flex-col gap-1.5">
                     <div className="flex justify-between items-center">
@@ -1659,6 +1818,186 @@ export default function ScheduleAdminPage({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 7: STATES & ADMINS OFFICER CLEARANCE */}
+          {activeAdminTab === 'States & Admins' && adminSession?.roleLevel === 'root' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-left animate-fade-in text-[#e2e8f0]">
+              
+              {/* Left Column: States Boundaries */}
+              <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-950/40">
+                <div className="border-b border-slate-800 pb-4 mb-5 flex justify-between items-center bg-transparent">
+                  <div>
+                    <h3 className="font-heading font-extrabold text-lg text-white">State Server Boundaries</h3>
+                    <p className="text-[10px] text-slate-400 font-mono tracking-wider uppercase">Active state partitions</p>
+                  </div>
+                  <span className="text-xs bg-cyan-950 text-cyan-400 border border-cyan-500/20 px-2 py-1 rounded font-mono font-bold">
+                    {states.length} Active Partitions
+                  </span>
+                </div>
+
+                {/* State list */}
+                <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                  {states.map((st) => (
+                    <div key={st.id} className="p-3.5 rounded-xl border border-slate-850 bg-slate-900/10 flex justify-between items-start gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-cyan-400" />
+                          <strong className="text-sm text-slate-200">State {st.state_number}</strong>
+                          <span className="text-[9px] font-mono text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">{st.id}</span>
+                        </div>
+                        <div className="text-xs text-slate-400 space-y-0.5 pl-6">
+                          <p className="truncate max-w-[210px]"><span className="text-slate-500 font-mono">Sheet ID:</span> {st.google_spreadsheet_id || 'Not Mapped'}</p>
+                          <p><span className="text-slate-500 font-mono">Sheet Tab:</span> {st.google_sheet_name || 'Sheet1'}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          if (onDeleteState) {
+                            await onDeleteState(st.id);
+                          }
+                        }}
+                        className="p-1 px-2.5 text-[10px] font-mono font-semibold rounded bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/20 text-rose-455 hover:text-rose-400 transition-all cursor-pointer"
+                      >
+                        Purge State
+                      </button>
+                    </div>
+                  ))}
+                  {states.length === 0 && (
+                    <div className="p-8 text-center text-slate-500 italic text-xs">
+                      No state boundaries registered.
+                    </div>
+                  )}
+                </div>
+
+                {/* Add state form */}
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const stateNumInput = (e.currentTarget.elements.namedItem('stateNumber') as HTMLInputElement).value?.trim();
+                    if (!stateNumInput) return;
+                    if (onAddState) {
+                      await onAddState(stateNumInput);
+                      (e.currentTarget.elements.namedItem('stateNumber') as HTMLInputElement).value = '';
+                    }
+                  }}
+                  className="mt-5 pt-4 border-t border-slate-900 flex items-center gap-2"
+                >
+                  <div className="relative flex-1">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-500">STATE</span>
+                    <input
+                      name="stateNumber"
+                      type="number"
+                      placeholder="E.g. 1127"
+                      required
+                      className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl pl-16 pr-3 py-2 text-xs text-white outline-none transition-colors"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)] truncate"
+                  >
+                    Register State
+                  </button>
+                </form>
+              </div>
+
+              {/* Right Column: Officer Clearance (Admins) */}
+              <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-950/40">
+                <div className="border-b border-slate-800 pb-4 mb-5 flex justify-between items-center">
+                  <div>
+                    <h3 className="font-heading font-extrabold text-lg text-white">Officer Authentication Clearance</h3>
+                    <p className="text-[10px] text-slate-400 font-mono tracking-wider uppercase">Administrative Clearance List</p>
+                  </div>
+                  <span className="text-xs bg-indigo-950 text-indigo-400 border border-indigo-500/20 px-2 py-1 rounded font-mono font-bold">
+                    {adminsList.length} Officers
+                  </span>
+                </div>
+
+                {/* Admins list */}
+                {loadingAdmins ? (
+                  <div className="p-8 text-center text-slate-450 italic text-xs animate-pulse">Running active audit list query...</div>
+                ) : (
+                  <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                    {adminsList.map((adm) => (
+                      <div key={adm.username} className="p-3 rounded-xl border border-slate-850 bg-slate-900/10 flex justify-between items-center gap-3">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Users className="w-3.5 h-3.5 text-indigo-400" />
+                            <span className="text-sm font-semibold text-slate-250">{adm.username}</span>
+                            <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                              adm.role_level === 'root' 
+                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                                : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                            }`}>
+                              {adm.role_level === 'root' ? 'Root' : 'State Admin'}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 pl-5">
+                            {adm.role_level === 'root' ? 'All States (Global Supervisor)' : `Assigned: State ${states.find(s => s.id === adm.assigned_state_id)?.state_number || 'Unknown'}`}
+                          </p>
+                        </div>
+
+                        {adm.username !== 'DEAD' && (
+                          <button
+                            onClick={() => handleDeleteAdmin(adm.username)}
+                            className="p-1 px-2 text-[10px] font-mono rounded bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/20 text-rose-455 hover:text-rose-400 transition-all cursor-pointer"
+                          >
+                            Revoke Clearance
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Create Officer Account Form */}
+                <form onSubmit={handleCreateAdmin} className="mt-5 pt-4 border-t border-slate-900 space-y-3.5">
+                  <h4 className="text-xs font-mono font-bold text-slate-300 uppercase tracking-widest">Elevate New Officer</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Username (e.g. DEAD-MEMBER)"
+                      value={newAdminUser}
+                      onChange={(e) => setNewAdminUser(e.target.value)}
+                      className="w-full bg-[#050c18] border border-slate-800 focus:border-indigo-500/60 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none transition-colors"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Clearance Passcode"
+                      value={newAdminPass}
+                      onChange={(e) => setNewAdminPass(e.target.value)}
+                      className="w-full bg-[#050c18] border border-slate-800 focus:border-indigo-500/60 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none transition-colors"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={newAdminState}
+                      onChange={(e) => setNewAdminState(e.target.value)}
+                      className="flex-1 bg-[#050c18] border border-slate-800 focus:border-indigo-500/60 rounded-xl px-3 py-2 text-xs text-white outline-none transition-colors"
+                    >
+                      <option value="">-- Assign State / Server Boundary --</option>
+                      {states.map(s => (
+                        <option key={s.id} value={s.id}>State {s.state_number}</option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="submit"
+                      className="px-4 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-[0_0_15px_rgba(79,70,229,0.15)] shrink-0"
+                    >
+                      Authorize Officer
+                    </button>
+                  </div>
+
+                  {errAdminCreate && <p className="text-[11px] font-mono text-rose-455">{errAdminCreate}</p>}
+                </form>
+              </div>
+
             </div>
           )}
 

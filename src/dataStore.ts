@@ -17,14 +17,7 @@ export const CAMPAIGN_WEEKS: CampaignWeek[] = [
   { id: 'w30', label: "Week 30: Jul 26 - Aug 01", description: "Late July campaign week registry" }
 ];
 
-export const INITIAL_ALLIANCES: Alliance[] = [
-  { id: 'all-1', name: 'Bastion Throne', tag: 'BTN', color: '#ec4899' }, // pink
-  { id: 'all-2', name: 'Shadow Spies', tag: 'SPY', color: '#a855f7' }, // purple
-  { id: 'all-3', name: 'Dominion Coalition', tag: 'DNC', color: '#f97316' }, // orange
-  { id: 'all-4', name: 'Blizzard Vanguard', tag: 'BAZ', color: '#3b82f6' }, // blue
-  { id: 'all-5', name: 'Frozen Fellowship', tag: 'FzF', color: '#22c55e' }, // green
-  { id: 'all-6', name: 'Royal Scepter', tag: 'ROYAL', color: '#06b6d4' } // cyan
-];
+export const INITIAL_ALLIANCES: Alliance[] = [];
 
 // Generate 48 slots (30 min intervals starting from 00:00 to 23:30)
 export function generateEmptySlots(): Slot[] {
