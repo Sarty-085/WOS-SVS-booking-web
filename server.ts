@@ -867,6 +867,19 @@ async function startServer() {
         );
       `);
 
+      // Migration: Create sent_reminders table to track sent Discord/Email notifications
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS sent_reminders (
+          booking_id TEXT NOT NULL,
+          slot_id TEXT NOT NULL,
+          week TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          sent_at TEXT NOT NULL,
+          channel TEXT NOT NULL, -- 'discord' or 'email'
+          PRIMARY KEY (booking_id, slot_id, week, channel)
+        );
+      `);
+
       // Seed default alliances if empty
       const { rows } = await client.query("SELECT COUNT(*) FROM alliances");
       if (parseInt(rows[0].count, 10) === 0) {
@@ -957,6 +970,9 @@ async function startServer() {
       const passRes = await pool.query("SELECT value FROM settings WHERE key = 'smtp_pass'");
       const smtpPass = passRes.rows[0]?.value || process.env.SMTP_PASS || '';
 
+      const discordTokenRes = await pool.query("SELECT value FROM settings WHERE key = 'discord_bot_token'");
+      const discordBotTokenObj = discordTokenRes.rows[0]?.value || '';
+
       let email = null;
       let configured = false;
 
@@ -977,7 +993,8 @@ async function startServer() {
         smtpPort,
         smtpUser,
         smtpFrom,
-        isSmtpConfigured: !!smtpPass
+        isSmtpConfigured: !!smtpPass,
+        isDiscordConfigured: !!discordBotTokenObj
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

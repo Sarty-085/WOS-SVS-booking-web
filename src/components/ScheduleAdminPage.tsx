@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Shield, Users, FileText, CalendarDays, BarChart2, Plus, Lock, Unlock, 
-  Trash2, Edit, Check, RefreshCw, Layers, Sparkles, LogOut, Clock, Play, MapPin, CheckCircle
+  Trash2, Edit, Check, RefreshCw, Layers, Sparkles, LogOut, Clock, Play, MapPin, CheckCircle,
+  Bot, MessageSquare
 } from 'lucide-react';
 import { Alliance, Booking, Slot, AuditLog, EventType, SlotStatus } from '../types';
 import { loadDailySlots, CAMPAIGN_WEEKS } from '../dataStore';
@@ -71,6 +72,11 @@ export default function ScheduleAdminPage({
   const [isSmtpConfigured, setIsSmtpConfigured] = useState(false);
   const [showSmtpPassInput, setShowSmtpPassInput] = useState(false);
 
+  // Discord Bot settings state
+  const [discordBotToken, setDiscordBotToken] = useState('');
+  const [isDiscordConfigured, setIsDiscordConfigured] = useState(false);
+  const [showDiscordTokenInput, setShowDiscordTokenInput] = useState(false);
+
   // Fetch setup details from the background API
   const fetchSheetsStats = async () => {
     try {
@@ -86,6 +92,7 @@ export default function ScheduleAdminPage({
         setSmtpUser(data.smtpUser || '');
         setSmtpFrom(data.smtpFrom || '');
         setIsSmtpConfigured(data.isSmtpConfigured || false);
+        setIsDiscordConfigured(data.isDiscordConfigured || false);
       }
     } catch (err) {
       console.error("Error loading sheets statistics:", err);
@@ -171,9 +178,19 @@ export default function ScheduleAdminPage({
         setShowSmtpPassInput(false);
       }
 
+      if (discordBotToken.trim()) {
+        await fetch('/api/settings/discord_bot_token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: discordBotToken.trim() })
+        });
+        setDiscordBotToken('');
+        setShowDiscordTokenInput(false);
+      }
+
       await fetchSheetsStats();
-      addAdminAuditLog("Admin", "slot_lock", "Updated background Google Registry Sync & Nodemailer SMTP parameters.");
-      alert("System Registry & notification configuration saved successfully! If proper SMTP credentials are set, emails will trigger in the background.");
+      addAdminAuditLog("Admin", "slot_lock", "Updated background Google Registry Sync, Nodemailer SMTP, and Discord Bot Token parameters.");
+      alert("System Registry & notification configuration saved successfully! If proper Discord or SMTP credentials are set, notifications will trigger.");
       setSyncStatusMsg("Saved successfully!");
     } catch (err: any) {
       alert("Failed storing parameters: " + err.message);
@@ -1587,6 +1604,44 @@ export default function ScheduleAdminPage({
                       </div>
                     )}
                     <span className="text-[9px] text-slate-500">Requires a valid SMTP credential. For standard Gmail addresses, configure Google 2-Step Verification, generate a 16-character <b>App Password</b>, and configure host <b>smtp.gmail.com</b> with Port <b>465</b>.</span>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-[1px] bg-slate-900/60 my-2" />
+
+                  {/* Discord Automation Section */}
+                  <h4 className="text-xs font-mono font-bold text-slate-350 uppercase tracking-wider flex items-center gap-1.5 pt-1">
+                    <Bot className="w-3.5 h-3.5 text-indigo-400" /> 🤖 Discord Reminders & Bot Automation
+                  </h4>
+
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase">Discord Bot Token:</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowDiscordTokenInput(!showDiscordTokenInput)}
+                        className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
+                      >
+                        {showDiscordTokenInput ? 'Cancel' : isDiscordConfigured ? 'Change Token' : 'Add Token'}
+                      </button>
+                    </div>
+
+                    {showDiscordTokenInput ? (
+                      <input
+                        type="password"
+                        value={discordBotToken}
+                        onChange={(e) => setDiscordBotToken(e.target.value)}
+                        placeholder="Enter Discord Bot Secret Token"
+                        className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                      />
+                    ) : (
+                      <div className="w-full bg-slate-950 border border-slate-900 text-slate-500 text-[11px] font-mono rounded-xl px-3 py-2 text-center select-none italic">
+                        {isDiscordConfigured ? '🤖 Discord Bot connected & database linkage active' : '❌ Discord Bot Token inactive/unconfigured'}
+                      </div>
+                    )}
+                    <p className="text-[9px] text-slate-500 leading-normal">
+                      The bot connects with the database, matches bookings, and automatically dispatches rich, clean embeds for <b>30-minute commencement warnings</b> directly to users' DMs!
+                    </p>
                   </div>
 
                   {/* Action button */}

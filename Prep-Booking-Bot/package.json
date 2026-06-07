@@ -1,0 +1,15 @@
+{
+  "name": "svs-prep-booking-discord-bot",
+  "version": "1.0.0",
+  "description": "Standalone automated Discord notification bot for SVS Prep Booking",
+  "main": "bot.js",
+  "type": "module",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.0",
+    "dotenv": "^16.4.5",
+    "pg": "^8.11.5"
+  }
+}

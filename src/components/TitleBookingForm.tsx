@@ -226,7 +226,7 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
                   <input
                     id="form-discord"
                     type="text"
-                    placeholder="e.g. sarthak_cmd"
+                    placeholder="e.g. i_am_dead_for_sure"
                     value={discordUsername}
                     onChange={(e) => setDiscordUsername(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl py-3 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition-all font-sans"
@@ -237,6 +237,9 @@ export default function TitleBookingForm({ alliances, onAddBooking, initialSelec
               <div className="md:col-span-2">
                 <p className="text-[10.5px] text-slate-400 leading-relaxed font-sans font-medium">
                   🔒 Providing email and/or Discord username is <b>optional</b>. If supplied, they will be used by our automated notification bot to keep you instantly posted on slot overrides or scheduling confirmations directly.
+                </p>
+                <p className="text-[10px] text-amber-500/90 leading-relaxed font-sans font-semibold mt-1">
+                  ⚠️ Discord reminders: Please ensure you enable <b>"Allow direct messages from server members"</b> in your Discord privacy settings so our notification bot can send you private reminder DMs.
                 </p>
               </div>
             </div>
