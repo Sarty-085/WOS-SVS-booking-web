@@ -106,7 +106,7 @@ export default function App() {
     const fetchStateData = async () => {
       if (!selectedState) return;
       try {
-        const alliancesRes = await fetch('/api/alliances');
+        const alliancesRes = await fetch(`/api/alliances?stateId=${selectedState.id}`);
         if (alliancesRes.ok) {
           const alls = await alliancesRes.json();
           setAlliances(alls);
@@ -198,7 +198,7 @@ export default function App() {
       }
 
       // Refetch from database
-      const alliancesRes = await fetch('/api/alliances');
+      const alliancesRes = await fetch(selectedState ? `/api/alliances?stateId=${selectedState.id}` : '/api/alliances');
       if (alliancesRes.ok) {
         const alls = await alliancesRes.json();
         setAlliances(alls);
@@ -229,7 +229,7 @@ export default function App() {
       }
 
       // Refetch to guarantee absolute sync
-      const alliancesRes = await fetch('/api/alliances');
+      const alliancesRes = await fetch(selectedState ? `/api/alliances?stateId=${selectedState.id}` : '/api/alliances');
       if (alliancesRes.ok) {
         const alls = await alliancesRes.json();
         setAlliances(alls);
@@ -277,7 +277,7 @@ export default function App() {
       }
 
       // Refetch to guarantee absolute sync
-      const alliancesRes = await fetch('/api/alliances');
+      const alliancesRes = await fetch(selectedState ? `/api/alliances?stateId=${selectedState.id}` : '/api/alliances');
       if (alliancesRes.ok) {
         const alls = await alliancesRes.json();
         setAlliances(alls);

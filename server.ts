@@ -10,12 +10,8 @@ import { loadDailySlots } from './src/dataStore';
 
 const { Pool } = pg;
 
-// DATABASE_URL must be set in environment (via Render env vars or .env locally)
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  console.error("FATAL: DATABASE_URL environment variable is not set. Please configure it in your Render dashboard or .env file.");
-  process.exit(1);
-}
+// Use Neon database connection string as default / fallback
+const connectionString = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_NrZ0fLbFap2Q@ep-wispy-river-ao7qo2tt-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
 
 const pool = new Pool({
   connectionString,
@@ -1506,8 +1502,7 @@ async function checkAndSendEmailNotifications({
 
 async function startServer() {
   const app = express();
-  // Render injects PORT dynamically; fall back to 3000 for local dev
-  const PORT = parseInt(process.env.PORT || '3000', 10);
+  const PORT = 3000;
 
   app.use(express.json());
 
