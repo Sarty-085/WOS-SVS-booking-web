@@ -1747,15 +1747,25 @@ async function startServer() {
   // Google Service Account Sync & SMTP Stats Route
   app.get('/api/google-sheets/stats', async (req, res) => {
     try {
+      const session = getSession(req);
+      if (!session) {
+        return res.status(401).json({ error: "Access denied. Please authenticate as administrator first." });
+      }
+
+      const isStateAdmin = session.roleLevel === 2;
+      const isRoot = session.roleLevel === 1;
+
+      if (!isRoot && !isStateAdmin) {
+        return res.status(403).json({ error: "Access denied. Clearances restricted." });
+      }
+
       let rawSpreadsheetId = null;
       let rawSheetName = 'Sheet1';
       const stateIdQuery = req.query.stateId;
-      
-      const session = getSession(req);
-      const isStateAdmin = session && session.roleLevel === 2;
+
       if (isStateAdmin) {
-        if (stateIdQuery !== session.assignedStateId) {
-          return res.status(403).json({ error: "Access denied. Clearances restricted to assigned state." });
+        if (!stateIdQuery || stateIdQuery !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. Clearances restricted to assigned state only." });
         }
       }
 
@@ -1791,8 +1801,8 @@ async function startServer() {
         return res.json({
           spreadsheetId: rawSpreadsheetId,
           sheetName: rawSheetName,
-          serviceAccountEmail: email,
-          isConfigured: configured,
+          serviceAccountEmail: null,
+          isConfigured: configured, // allow verification checks for sync eligibility
           adminNotificationEmail: "",
           smtpHost: "smtp.gmail.com",
           smtpPort: "465",
@@ -1848,7 +1858,11 @@ async function startServer() {
     const stateIdStr = req.query.stateId || req.body.stateId || undefined;
     
     const session = getSession(req);
-    if (session && session.roleLevel === 2) {
+    if (!session) {
+      return res.status(401).json({ error: "Access denied. Please authenticate as administrator." });
+    }
+
+    if (session.roleLevel === 2) {
       if (stateIdStr !== session.assignedStateId) {
         return res.status(403).json({ error: "Access denied. State Administrators can only trigger sync on their assigned state." });
       }

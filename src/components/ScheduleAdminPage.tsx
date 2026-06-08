@@ -104,7 +104,11 @@ export default function ScheduleAdminPage({
   const fetchSheetsStats = async () => {
     try {
       const url = selectedState ? `/api/google-sheets/stats?stateId=${selectedState.id}` : '/api/google-sheets/stats';
-      const res = await fetch(url);
+      const headers: Record<string, string> = {};
+      if (adminSession?.token) {
+        headers['Authorization'] = `Bearer ${adminSession.token}`;
+      }
+      const res = await fetch(url, { headers });
       if (res.ok) {
         const data = await res.json();
         setGoogleSpreadsheetId(data.spreadsheetId || '');
@@ -344,7 +348,14 @@ export default function ScheduleAdminPage({
     setSyncStatusMsg("Triggering server-side Google Sheets Sync agent...");
     try {
       const url = selectedState ? `/api/google-sheets/sync?stateId=${selectedState.id}` : '/api/google-sheets/sync';
-      const res = await fetch(url, { method: 'POST' });
+      const headers: Record<string, string> = {};
+      if (adminSession?.token) {
+        headers['Authorization'] = `Bearer ${adminSession.token}`;
+      }
+      const res = await fetch(url, { 
+        method: 'POST',
+        headers
+      });
       const data = await res.json();
       if (res.ok && data.success) {
         addAdminAuditLog("Admin", "edit_booking", "Initiated manual server sync registry slots live to Google Sheets.");
@@ -1561,58 +1572,271 @@ export default function ScheduleAdminPage({
               </div>
 
               {/* SERVICE ACCOUNT DIRECTIONS & CREDENTIALS */}
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Step instructions */}
-                <div className="flex flex-col gap-3.5 pr-2">
-                  <h4 className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5 text-emerald-500" /> Setup & Security Instructions
-                  </h4>
-                  
-                  <ul className="text-xs text-slate-400 space-y-3 leading-relaxed">
-                    <li className="flex items-start gap-2.5">
-                      <span className="w-5 h-5 rounded-full bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center font-mono font-bold shrink-0 text-[10px]">1</span>
-                      <div>
-                        <strong className="text-slate-200">Share your spreadsheet:</strong> Go to your Google Sheet, click Share, paste the system service account email below (Editor permission) and click Send.
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-2.5">
-                      <span className="w-5 h-5 rounded-full bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center font-mono font-bold shrink-0 text-[10px]">2</span>
-                      <div>
-                        <strong className="text-slate-200">Input Sheet details:</strong> Grab your Spreadsheet ID from its URL and input it below, along with your credentials JSON (if updating).
-                      </div>
-                    </li>
-                  </ul>
+              {adminSession?.roleLevel === 'root' ? (
+                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Step instructions */}
+                  <div className="flex flex-col gap-3.5 pr-2">
+                    <h4 className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-emerald-500" /> Setup & Security Instructions
+                    </h4>
+                    
+                    <ul className="text-xs text-slate-400 space-y-3 leading-relaxed">
+                      <li className="flex items-start gap-2.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center font-mono font-bold shrink-0 text-[10px]">1</span>
+                        <div>
+                          <strong className="text-slate-200">Share your spreadsheet:</strong> Go to your Google Sheet, click Share, paste the system service account email below (Editor permission) and click Send.
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-900 border border-slate-800 text-slate-300 flex items-center justify-center font-mono font-bold shrink-0 text-[10px]">2</span>
+                        <div>
+                          <strong className="text-slate-200">Input Sheet details:</strong> Grab your Spreadsheet ID from its URL and input it below, along with your credentials JSON (if updating).
+                        </div>
+                      </li>
+                    </ul>
 
-                  {saEmail ? (
-                    <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-900 mt-1 flex flex-col gap-1.5 relative">
-                      <span className="text-[10px] font-mono font-bold text-slate-500 uppercase">SYSTEM DELEGATE EMAIL:</span>
-                      <div className="flex items-center justify-between gap-2.5">
-                        <code className="text-xs font-mono text-[#a7f3d0] break-all select-all font-semibold">{saEmail}</code>
+                    {saEmail ? (
+                      <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-900 mt-1 flex flex-col gap-1.5 relative">
+                        <span className="text-[10px] font-mono font-bold text-slate-500 uppercase">SYSTEM DELEGATE EMAIL:</span>
+                        <div className="flex items-center justify-between gap-2.5">
+                          <code className="text-xs font-mono text-[#a7f3d0] break-all select-all font-semibold">{saEmail}</code>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(saEmail);
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
+                            }}
+                            className="text-[10px] font-mono px-2 py-1 rounded bg-[#092212] border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer shrink-0"
+                          >
+                            {copied ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 text-[11px] bg-amber-950/20 rounded-xl border border-amber-500/10 text-amber-400/90 leading-normal">
+                        ℹ️ Credentials JSON isn't set up yet. Paste your Service Account key file content in the credential settings below to generate your system delegate email.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Settings inputs */}
+                  <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-900 flex flex-col gap-4">
+                    <h4 className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-cyan-500" /> Registry Parameters
+                    </h4>
+
+                    {/* Sheet ID Input */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">Google Spreadsheet ID:</label>
+                      <input
+                        type="text"
+                        value={googleSpreadsheetId}
+                        onChange={(e) => setGoogleSpreadsheetId(e.target.value)}
+                        placeholder="E.g. 1sU5AasK_1Wp9RzFfHdf98v2..."
+                        className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                      />
+                      <span className="text-[9px] text-slate-500">Extracted from spreadsheet URL: <code className="text-slate-400">/spreadsheets/d/[SPEADSHEET_ID_HERE]/edit</code></span>
+                    </div>
+
+                    {/* Sheet Tab Name Input */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">Google Sheet Tab Name:</label>
+                      <input
+                        type="text"
+                        value={googleSheetName}
+                        onChange={(e) => setGoogleSheetName(e.target.value)}
+                        placeholder="Sheet1"
+                        className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                      />
+                      <span className="text-[9px] text-slate-500">Specify the exact sheet tab name inside your private Google Spreadsheet (defaults to <code className="text-slate-400">Sheet1</code>).</span>
+                    </div>
+
+                    {/* Credentials JSON Key */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-mono text-slate-400 font-bold uppercase">Service Account JSON Key:</label>
                         <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(saEmail);
-                            setCopied(true);
-                            setTimeout(() => setCopied(false), 2000);
-                          }}
-                          className="text-[10px] font-mono px-2 py-1 rounded bg-[#092212] border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer shrink-0"
+                          type="button"
+                          onClick={() => setShowJsonInput(!showJsonInput)}
+                          className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
                         >
-                          {copied ? 'Copied!' : 'Copy'}
+                          {showJsonInput ? 'Cancel' : isSaConfigured ? 'Change credentials key' : 'Add credentials key'}
                         </button>
                       </div>
+
+                      {showJsonInput ? (
+                        <textarea
+                          rows={4}
+                          value={googleSaJson}
+                          onChange={(e) => setGoogleSaJson(e.target.value)}
+                          placeholder='Paste entire {"type": "service_account", ...} JSON file content here'
+                          className="w-full bg-[#050c18] border border-slate-850 focus:border-cyan-500/60 rounded-xl p-2.5 text-[10px] text-green-400 font-mono placeholder-slate-700 outline-none transition-all resize-y"
+                        />
+                      ) : (
+                        <div className="w-full bg-slate-950 border border-slate-900 text-slate-500 text-[11px] font-mono rounded-xl px-3 py-2 text-center select-none italic">
+                          {isSaConfigured ? '🔒 Encrypted key configured in secure database' : '❌ No private key provided'}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="p-3 text-[11px] bg-amber-950/20 rounded-xl border border-amber-500/10 text-amber-400/90 leading-normal">
-                      ℹ️ Credentials JSON isn't set up yet. Paste your Service Account key file content in the credential settings below to generate your system delegate email.
+
+                    {/* Divider */}
+                    <div className="h-[1px] bg-slate-900/60 my-2" />
+
+                    {/* SMTP Integration Section */}
+                    <h4 className="text-xs font-mono font-bold text-slate-350 uppercase tracking-wider flex items-center gap-1.5 pt-1">
+                      📬 SMTP Email Dispatcher Setup
+                    </h4>
+
+                    {/* Admin Notification Email */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">Admin Notification Email:</label>
+                      <input
+                        type="email"
+                        value={adminNotificationEmail}
+                        onChange={(e) => setAdminNotificationEmail(e.target.value)}
+                        placeholder="E.g. admin@yourdomain.com"
+                        className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                      />
+                      <span className="text-[9px] text-slate-500">The supreme admin receives real-time reports when a displacement conflict occurs.</span>
                     </div>
-                  )}
+
+                    {/* SMTP Host and Port */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="flex flex-col gap-1.5 col-span-2">
+                        <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">SMTP Host:</label>
+                        <input
+                          type="text"
+                          value={smtpHost}
+                          onChange={(e) => setSmtpHost(e.target.value)}
+                          placeholder="smtp.gmail.com"
+                          className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">SMTP Port:</label>
+                        <input
+                          type="text"
+                          value={smtpPort}
+                          onChange={(e) => setSmtpPort(e.target.value)}
+                          placeholder="465"
+                          className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    {/* SMTP Username */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">SMTP Username / Email Address:</label>
+                      <input
+                        type="text"
+                        value={smtpUser}
+                        onChange={(e) => setSmtpUser(e.target.value)}
+                        placeholder="E.g. naiksarthak920@gmail.com"
+                        className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                      />
+                    </div>
+
+                    {/* Friendly From Address */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">Display Sender name:</label>
+                      <input
+                        type="text"
+                        value={smtpFrom}
+                        onChange={(e) => setSmtpFrom(e.target.value)}
+                        placeholder='E.g. SVS Booking <naiksarthak920@gmail.com>'
+                        className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                      />
+                    </div>
+
+                    {/* App Password */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-mono text-slate-400 font-bold uppercase">SMTP / Gmail App Password:</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowSmtpPassInput(!showSmtpPassInput)}
+                          className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
+                        >
+                          {showSmtpPassInput ? 'Cancel' : isSmtpConfigured ? 'Change Password' : 'Add Password'}
+                        </button>
+                      </div>
+
+                      {showSmtpPassInput ? (
+                        <input
+                          type="password"
+                          value={smtpPass}
+                          onChange={(e) => setSmtpPass(e.target.value)}
+                          placeholder="Enter SMTP password or Gmail App Password"
+                          className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                        />
+                      ) : (
+                        <div className="w-full bg-slate-950 border border-slate-900 text-slate-500 text-[11px] font-mono rounded-xl px-3 py-2 text-center select-none italic">
+                          {isSmtpConfigured ? '🔑 SMTP password configured & active' : '❌ SMTP inactive (emails disabled)'}
+                        </div>
+                      )}
+                      <span className="text-[9px] text-slate-500">Requires a valid SMTP credential. For standard Gmail addresses, configure Google 2-Step Verification, generate a 16-character <b>App Password</b>, and configure host <b>smtp.gmail.com</b> with Port <b>465</b>.</span>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="h-[1px] bg-slate-900/60 my-2" />
+
+                    {/* Discord Automation Section */}
+                    <h4 className="text-xs font-mono font-bold text-slate-350 uppercase tracking-wider flex items-center gap-1.5 pt-1">
+                      <Bot className="w-3.5 h-3.5 text-indigo-400" /> 🤖 Discord Reminders & Bot Automation
+                    </h4>
+
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-mono text-slate-400 font-bold uppercase">Discord Bot Token:</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowDiscordTokenInput(!showDiscordTokenInput)}
+                          className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
+                        >
+                          {showDiscordTokenInput ? 'Cancel' : isDiscordConfigured ? 'Change Token' : 'Add Token'}
+                        </button>
+                      </div>
+
+                      {showDiscordTokenInput ? (
+                        <input
+                          type="password"
+                          value={discordBotToken}
+                          onChange={(e) => setDiscordBotToken(e.target.value)}
+                          placeholder="Enter Discord Bot Secret Token"
+                          className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
+                        />
+                      ) : (
+                        <div className="w-full bg-slate-950 border border-slate-900 text-slate-500 text-[11px] font-mono rounded-xl px-3 py-2 text-center select-none italic">
+                          {isDiscordConfigured ? '🤖 Discord Bot connected & database linkage active' : '❌ Discord Bot Token inactive/unconfigured'}
+                        </div>
+                      )}
+                      <p className="text-[9px] text-slate-500 leading-normal">
+                        The bot connects with the database, matches bookings, and automatically dispatches rich, clean embeds for <b>30-minute commencement warnings</b> directly to users' DMs!
+                      </p>
+                    </div>
+
+                    {/* Action button */}
+                    <div className="flex items-center justify-between gap-3 pt-3">
+                      <span className="text-[10px] font-mono text-slate-400 font-bold tracking-tight">
+                        {syncStatusMsg && <span className="text-slate-350">{syncStatusMsg}</span>}
+                      </span>
+                      <button
+                        onClick={handleSaveSheetsSettings}
+                        disabled={isSyncing}
+                        className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)] flex items-center gap-1.5"
+                      >
+                        Save Configuration Settings
+                      </button>
+                    </div>
+                  </div>
                 </div>
-
-                {/* Settings inputs */}
-                <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-900 flex flex-col gap-4">
-                  <h4 className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-cyan-500" /> Registry Parameters
+              ) : (
+                // State Administrator View - Restricted entirely to non-sensitive Fields
+                <div className="mt-5 max-w-2xl mx-auto bg-slate-950/40 p-6 rounded-2xl border border-slate-900 flex flex-col gap-5 w-full">
+                  <h4 className="text-xs font-mono font-bold text-slate-350 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-900 pb-2">
+                    <Layers className="w-4 h-4 text-cyan-400" /> State Registry Parameters
                   </h4>
-
+                  
                   {/* Sheet ID Input */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">Google Spreadsheet ID:</label>
@@ -1623,7 +1847,9 @@ export default function ScheduleAdminPage({
                       placeholder="E.g. 1sU5AasK_1Wp9RzFfHdf98v2..."
                       className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
                     />
-                    <span className="text-[9px] text-slate-500">Extracted from spreadsheet URL: <code className="text-slate-400">/spreadsheets/d/[SPEADSHEET_ID_HERE]/edit</code></span>
+                    <span className="text-[9px] text-slate-500 font-mono">
+                      Paste the Spreadsheet ID for your state's spreadsheet (from URL: <code className="text-slate-400">/spreadsheets/d/[SPEADSHEET_ID_HERE]/edit</code>).
+                    </span>
                   </div>
 
                   {/* Sheet Tab Name Input */}
@@ -1636,188 +1862,26 @@ export default function ScheduleAdminPage({
                       placeholder="Sheet1"
                       className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
                     />
-                    <span className="text-[9px] text-slate-500">Specify the exact sheet tab name inside your private Google Spreadsheet (defaults to <code className="text-slate-400">Sheet1</code>).</span>
-                  </div>
-
-                  {/* Credentials JSON Key */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase">Service Account JSON Key:</label>
-                      <button
-                        type="button"
-                        onClick={() => setShowJsonInput(!showJsonInput)}
-                        className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
-                      >
-                        {showJsonInput ? 'Cancel' : isSaConfigured ? 'Change credentials key' : 'Add credentials key'}
-                      </button>
-                    </div>
-
-                    {showJsonInput ? (
-                      <textarea
-                        rows={4}
-                        value={googleSaJson}
-                        onChange={(e) => setGoogleSaJson(e.target.value)}
-                        placeholder='Paste entire {"type": "service_account", ...} JSON file content here'
-                        className="w-full bg-[#050c18] border border-slate-850 focus:border-cyan-500/60 rounded-xl p-2.5 text-[10px] text-green-400 font-mono placeholder-slate-700 outline-none transition-all resize-y"
-                      />
-                    ) : (
-                      <div className="w-full bg-slate-950 border border-slate-900 text-slate-500 text-[11px] font-mono rounded-xl px-3 py-2 text-center select-none italic">
-                        {isSaConfigured ? '🔒 Encrypted key configured in secure database' : '❌ No private key provided'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Divider */}
-                  <div className="h-[1px] bg-slate-900/60 my-2" />
-
-                  {/* SMTP Integration Section */}
-                  <h4 className="text-xs font-mono font-bold text-slate-350 uppercase tracking-wider flex items-center gap-1.5 pt-1">
-                    📬 SMTP Email Dispatcher Setup
-                  </h4>
-
-                  {/* Admin Notification Email */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">Admin Notification Email:</label>
-                    <input
-                      type="email"
-                      value={adminNotificationEmail}
-                      onChange={(e) => setAdminNotificationEmail(e.target.value)}
-                      placeholder="E.g. admin@yourdomain.com"
-                      className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
-                    />
-                    <span className="text-[9px] text-slate-500">The supreme admin receives real-time reports when a displacement conflict occurs.</span>
-                  </div>
-
-                  {/* SMTP Host and Port */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="flex flex-col gap-1.5 col-span-2">
-                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">SMTP Host:</label>
-                      <input
-                        type="text"
-                        value={smtpHost}
-                        onChange={(e) => setSmtpHost(e.target.value)}
-                        placeholder="smtp.gmail.com"
-                        className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">SMTP Port:</label>
-                      <input
-                        type="text"
-                        value={smtpPort}
-                        onChange={(e) => setSmtpPort(e.target.value)}
-                        placeholder="465"
-                        className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  {/* SMTP Username */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">SMTP Username / Email Address:</label>
-                    <input
-                      type="text"
-                      value={smtpUser}
-                      onChange={(e) => setSmtpUser(e.target.value)}
-                      placeholder="E.g. naiksarthak920@gmail.com"
-                      className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
-                    />
-                  </div>
-
-                  {/* Friendly From Address */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-mono text-slate-400 font-bold uppercase block">Display Sender name:</label>
-                    <input
-                      type="text"
-                      value={smtpFrom}
-                      onChange={(e) => setSmtpFrom(e.target.value)}
-                      placeholder='E.g. SVS Booking <naiksarthak920@gmail.com>'
-                      className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
-                    />
-                  </div>
-
-                  {/* App Password */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase">SMTP / Gmail App Password:</label>
-                      <button
-                        type="button"
-                        onClick={() => setShowSmtpPassInput(!showSmtpPassInput)}
-                        className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
-                      >
-                        {showSmtpPassInput ? 'Cancel' : isSmtpConfigured ? 'Change Password' : 'Add Password'}
-                      </button>
-                    </div>
-
-                    {showSmtpPassInput ? (
-                      <input
-                        type="password"
-                        value={smtpPass}
-                        onChange={(e) => setSmtpPass(e.target.value)}
-                        placeholder="Enter SMTP password or Gmail App Password"
-                        className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
-                      />
-                    ) : (
-                      <div className="w-full bg-slate-950 border border-slate-900 text-slate-500 text-[11px] font-mono rounded-xl px-3 py-2 text-center select-none italic">
-                        {isSmtpConfigured ? '🔑 SMTP password configured & active' : '❌ SMTP inactive (emails disabled)'}
-                      </div>
-                    )}
-                    <span className="text-[9px] text-slate-500">Requires a valid SMTP credential. For standard Gmail addresses, configure Google 2-Step Verification, generate a 16-character <b>App Password</b>, and configure host <b>smtp.gmail.com</b> with Port <b>465</b>.</span>
-                  </div>
-
-                  {/* Divider */}
-                  <div className="h-[1px] bg-slate-900/60 my-2" />
-
-                  {/* Discord Automation Section */}
-                  <h4 className="text-xs font-mono font-bold text-slate-350 uppercase tracking-wider flex items-center gap-1.5 pt-1">
-                    <Bot className="w-3.5 h-3.5 text-indigo-400" /> 🤖 Discord Reminders & Bot Automation
-                  </h4>
-
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-[10px] font-mono text-slate-400 font-bold uppercase">Discord Bot Token:</label>
-                      <button
-                        type="button"
-                        onClick={() => setShowDiscordTokenInput(!showDiscordTokenInput)}
-                        className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
-                      >
-                        {showDiscordTokenInput ? 'Cancel' : isDiscordConfigured ? 'Change Token' : 'Add Token'}
-                      </button>
-                    </div>
-
-                    {showDiscordTokenInput ? (
-                      <input
-                        type="password"
-                        value={discordBotToken}
-                        onChange={(e) => setDiscordBotToken(e.target.value)}
-                        placeholder="Enter Discord Bot Secret Token"
-                        className="w-full bg-[#050c18] border border-slate-800 focus:border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-600 outline-none transition-colors"
-                      />
-                    ) : (
-                      <div className="w-full bg-slate-950 border border-slate-900 text-slate-500 text-[11px] font-mono rounded-xl px-3 py-2 text-center select-none italic">
-                        {isDiscordConfigured ? '🤖 Discord Bot connected & database linkage active' : '❌ Discord Bot Token inactive/unconfigured'}
-                      </div>
-                    )}
-                    <p className="text-[9px] text-slate-500 leading-normal">
-                      The bot connects with the database, matches bookings, and automatically dispatches rich, clean embeds for <b>30-minute commencement warnings</b> directly to users' DMs!
-                    </p>
+                    <span className="text-[9px] text-slate-500 font-mono">
+                      The exact sheet tab label inside your private Google Spreadsheet (e.g. <b>Sheet1</b>).
+                    </span>
                   </div>
 
                   {/* Action button */}
-                  <div className="flex items-center justify-between gap-3 pt-3">
+                  <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-900">
                     <span className="text-[10px] font-mono text-slate-400 font-bold tracking-tight">
                       {syncStatusMsg && <span className="text-slate-350">{syncStatusMsg}</span>}
                     </span>
                     <button
                       onClick={handleSaveSheetsSettings}
                       disabled={isSyncing}
-                      className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)] flex items-center gap-1.5"
+                      className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)] flex items-center gap-1.5 cursor-pointer"
                     >
-                      Save Configuration Settings
+                      Save Registry Settings
                     </button>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
