@@ -138,7 +138,7 @@ export default function App() {
         }
 
         // Fetch active reservation week setting from DB
-        const valRes = await fetch('/api/settings/active_week');
+        const valRes = await fetch(`/api/settings/active_week?stateId=${selectedState.id}`);
         if (valRes.ok) {
           const data = await valRes.json();
           if (data.value) {
@@ -155,9 +155,13 @@ export default function App() {
   // Change active reservation week in database
   const handleChangeActiveWeek = async (newWeek: string) => {
     try {
-      const response = await fetch('/api/settings/active_week', {
+      const stateQuery = selectedState ? `?stateId=${selectedState.id}` : '';
+      const response = await fetch(`/api/settings/active_week${stateQuery}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(adminSession?.token ? { 'Authorization': `Bearer ${adminSession.token}` } : {})
+        },
         body: JSON.stringify({ value: newWeek })
       });
       if (response.ok) {
@@ -314,6 +318,7 @@ export default function App() {
     const newBooking: Booking = {
       id: `book-${Date.now()}`,
       ...bookingData,
+      week: activeWeek,
       stateId: selectedState?.id || undefined,
       timestamp: new Date().toISOString()
     };
@@ -321,7 +326,10 @@ export default function App() {
     try {
       const response = await fetch('/api/bookings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(adminSession?.token ? { 'Authorization': `Bearer ${adminSession.token}` } : {})
+        },
         body: JSON.stringify(newBooking)
       });
       if (!response.ok) {
@@ -347,7 +355,12 @@ export default function App() {
     if (!target) return;
 
     try {
-      await fetch(`/api/bookings/${id}`, { method: 'DELETE' });
+      await fetch(`/api/bookings/${id}`, { 
+        method: 'DELETE',
+        headers: {
+          ...(adminSession?.token ? { 'Authorization': `Bearer ${adminSession.token}` } : {})
+        }
+      });
       const remaining = bookings.filter(b => b.id !== id);
       setBookings(remaining);
 
@@ -371,7 +384,10 @@ export default function App() {
     try {
       await fetch(`/api/bookings/${bookingId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(adminSession?.token ? { 'Authorization': `Bearer ${adminSession.token}` } : {})
+        },
         body: JSON.stringify({
           slotId: primarySlot,
           speedupDays,
