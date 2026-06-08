@@ -1684,6 +1684,13 @@ async function startServer() {
       const { key } = req.params;
       const { stateId } = req.query;
       
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        if (key !== 'active_week' || stateId !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. Clearances restricted to assigned state and settings." });
+        }
+      }
+      
       if (key === 'active_week' && stateId) {
         const { rows } = await pool.query("SELECT active_week FROM states WHERE id = $1", [stateId]);
         if (rows.length > 0) {
@@ -1704,9 +1711,21 @@ async function startServer() {
       const { value } = req.body;
       const { stateId } = req.query;
       
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        if (key !== 'active_week' || stateId !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. Clearances restricted to assigned state." });
+        }
+      }
+
       if (key === 'active_week' && stateId) {
         await pool.query("UPDATE states SET active_week = $1 WHERE id = $2", [value, stateId]);
         return res.json({ success: true });
+      }
+
+      // If they are not logged in as root (roleLevel === 1), they cannot modify global settings
+      if (!session || session.roleLevel !== 1) {
+        return res.status(403).json({ error: "Access denied. Only Supreme Root Administrators can update global settings." });
       }
 
       await pool.query(
@@ -1731,6 +1750,15 @@ async function startServer() {
       let rawSpreadsheetId = null;
       let rawSheetName = 'Sheet1';
       const stateIdQuery = req.query.stateId;
+      
+      const session = getSession(req);
+      const isStateAdmin = session && session.roleLevel === 2;
+      if (isStateAdmin) {
+        if (stateIdQuery !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. Clearances restricted to assigned state." });
+        }
+      }
+
       if (stateIdQuery) {
         const stateRes = await pool.query("SELECT google_spreadsheet_id, google_sheet_name FROM states WHERE id = $1", [stateIdQuery]);
         if (stateRes.rowCount > 0) {
@@ -1747,6 +1775,35 @@ async function startServer() {
       const saRes = await pool.query("SELECT value FROM settings WHERE key = 'google_service_account_json'");
       const rawSa = saRes.rows[0]?.value || null;
 
+      let email = null;
+      let configured = false;
+
+      if (rawSa) {
+        try {
+          const parsed = JSON.parse(rawSa);
+          email = parsed.client_email || null;
+          configured = !!(parsed.client_email && parsed.private_key);
+        } catch (e) {}
+      }
+
+      if (isStateAdmin) {
+        // Obfuscate / omit global details from state admin sessions
+        return res.json({
+          spreadsheetId: rawSpreadsheetId,
+          sheetName: rawSheetName,
+          serviceAccountEmail: email,
+          isConfigured: configured,
+          adminNotificationEmail: "",
+          smtpHost: "smtp.gmail.com",
+          smtpPort: "465",
+          smtpUser: "",
+          smtpFrom: "",
+          isSmtpConfigured: false,
+          isDiscordConfigured: false
+        });
+      }
+
+      // Root administrator response (with global settings returned)
       const adminEmailRes = await pool.query("SELECT value FROM settings WHERE key = 'admin_notification_email'");
       const adminEmail = adminEmailRes.rows[0]?.value || null;
 
@@ -1767,17 +1824,6 @@ async function startServer() {
 
       const discordTokenRes = await pool.query("SELECT value FROM settings WHERE key = 'discord_bot_token'");
       const discordBotTokenObj = discordTokenRes.rows[0]?.value || '';
-
-      let email = null;
-      let configured = false;
-
-      if (rawSa) {
-        try {
-          const parsed = JSON.parse(rawSa);
-          email = parsed.client_email || null;
-          configured = !!(parsed.client_email && parsed.private_key);
-        } catch (e) {}
-      }
 
       res.json({
         spreadsheetId: rawSpreadsheetId,
@@ -1800,6 +1846,14 @@ async function startServer() {
   // Manual Trigger Endpoint for Google Sheet sync
   app.post('/api/google-sheets/sync', async (req, res) => {
     const stateIdStr = req.query.stateId || req.body.stateId || undefined;
+    
+    const session = getSession(req);
+    if (session && session.roleLevel === 2) {
+      if (stateIdStr !== session.assignedStateId) {
+        return res.status(403).json({ error: "Access denied. State Administrators can only trigger sync on their assigned state." });
+      }
+    }
+
     const status = await syncPostgresToGoogleSheets(stateIdStr as string | undefined);
     if (status.success) {
       res.json({ success: true, message: status.message, email: status.email });
@@ -1812,6 +1866,14 @@ async function startServer() {
   app.get('/api/alliances', async (req, res) => {
     try {
       const { stateId } = req.query;
+      
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        if (!stateId || stateId !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. State Administrators can only retrieve alliance data for their assigned state." });
+        }
+      }
+
       let q = "SELECT * FROM alliances";
       let params: any[] = [];
       if (stateId) {
@@ -1830,6 +1892,14 @@ async function startServer() {
     try {
       const { id, name, tag, color, stateId } = req.body;
       const fStateId = await getFallbackStateId(stateId);
+
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        if (fStateId !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. State Administrators can only create alliances in their assigned state." });
+        }
+      }
+
       await pool.query(
         "INSERT INTO alliances (id, name, tag, color, state_id) VALUES ($1, $2, $3, $4, $5)",
         [id, name, tag, color, fStateId]
@@ -1846,6 +1916,18 @@ async function startServer() {
     try {
       const { id } = req.params;
       const { name } = req.body;
+
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        const allianceRes = await pool.query("SELECT state_id FROM alliances WHERE id = $1", [id]);
+        if (allianceRes.rows.length === 0) {
+          return res.status(404).json({ error: "Alliance not found." });
+        }
+        if (allianceRes.rows[0].state_id !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. State Administrators can only modify alliances in their assigned state." });
+        }
+      }
+
       await pool.query("UPDATE alliances SET name = $1 WHERE id = $2", [name, id]);
       triggerQuietBackgroundSync();
       res.json({ success: true });
@@ -1857,6 +1939,18 @@ async function startServer() {
   app.delete('/api/alliances/:id', async (req, res) => {
     try {
       const { id } = req.params;
+
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        const allianceRes = await pool.query("SELECT state_id FROM alliances WHERE id = $1", [id]);
+        if (allianceRes.rows.length === 0) {
+          return res.status(404).json({ error: "Alliance not found." });
+        }
+        if (allianceRes.rows[0].state_id !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. State Administrators can only delete alliances in their assigned state." });
+        }
+      }
+
       // Delete bookings associated with it
       await pool.query("DELETE FROM bookings WHERE alliance_id = $1", [id]);
       await pool.query("DELETE FROM alliances WHERE id = $1", [id]);
@@ -1874,8 +1968,13 @@ async function startServer() {
       let query = "SELECT id, state_number FROM states ORDER BY state_number ASC";
       let params: any[] = [];
       if (session) {
-        // Admins can see raw spreadsheets info
-        query = "SELECT * FROM states ORDER BY state_number ASC";
+        if (session.roleLevel === 2) {
+          query = "SELECT * FROM states WHERE id = $1 ORDER BY state_number ASC";
+          params = [session.assignedStateId];
+        } else {
+          // Admins can see raw spreadsheets info
+          query = "SELECT * FROM states ORDER BY state_number ASC";
+        }
       }
       const { rows } = await pool.query(query, params);
       res.json(rows);
@@ -1886,6 +1985,11 @@ async function startServer() {
 
   app.post('/api/states', async (req, res) => {
     try {
+      const session = getSession(req);
+      if (!session || session.roleLevel !== 1) {
+        return res.status(403).json({ error: "Only Supreme Root Administrators can register new state partitions." });
+      }
+
       const { id, stateNumber, googleSpreadsheetId, googleSheetName } = req.body;
       if (!stateNumber) {
         return res.status(400).json({ error: "State number is required." });
@@ -1944,11 +2048,15 @@ async function startServer() {
         return res.status(403).json({ error: "Only root operators can disband states." });
       }
       const { id } = req.params;
+      
+      // Manually clean up all dependencies to bypass any potential constraint issues on existing historical schemas
       await pool.query("UPDATE admins SET assigned_state_id = NULL WHERE assigned_state_id = $1", [id]);
+      await pool.query("DELETE FROM notifications WHERE state_id = $1", [id]);
       await pool.query("DELETE FROM bookings WHERE state_id = $1", [id]);
       await pool.query("DELETE FROM alliances WHERE state_id = $1", [id]);
       await pool.query("DELETE FROM audit_logs WHERE state_id = $1", [id]);
       await pool.query("DELETE FROM states WHERE id = $1", [id]);
+      
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -2065,6 +2173,14 @@ async function startServer() {
   app.get('/api/bookings', async (req, res) => {
     try {
       const stateId = req.query.stateId as string;
+      
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        if (!stateId || stateId !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. State Administrators can only retrieve bookings for their assigned state." });
+        }
+      }
+
       const bookings = await fetchCurrentBookingsFromDb(stateId);
       res.json(bookings);
     } catch (err: any) {
@@ -2076,6 +2192,13 @@ async function startServer() {
     try {
       const { id, playerName, userId, email, discordUsername, allianceId, eventType, speedupDays, speedupHours, score, slotId, backupSlots, autoAssign, timestamp, week, stateId } = req.body;
       const activeState = await getFallbackStateId(stateId);
+      
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        if (activeState !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. State Administrators can only make bookings in their assigned state." });
+        }
+      }
       
       const beforeBookings = await fetchCurrentBookingsFromDb(activeState);
 
@@ -2123,6 +2246,13 @@ async function startServer() {
       const activeState = lookupRes.rows[0].state_id;
       const targetDay = lookupRes.rows[0].event_type || 'monday';
 
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        if (activeState !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. State Administrators can only update bookings in their assigned state." });
+        }
+      }
+
       const beforeBookings = await fetchCurrentBookingsFromDb(activeState);
 
       await pool.query(
@@ -2161,6 +2291,13 @@ async function startServer() {
       const activeState = lookupRes.rows[0].state_id;
       const targetDay = lookupRes.rows[0].event_type || 'monday';
 
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        if (activeState !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. State Administrators can only delete bookings in their assigned state." });
+        }
+      }
+
       const beforeBookings = await fetchCurrentBookingsFromDb(activeState);
 
       await pool.query("DELETE FROM bookings WHERE id = $1", [id]);
@@ -2187,6 +2324,14 @@ async function startServer() {
   app.get('/api/audit-logs', async (req, res) => {
     try {
       const stateId = req.query.stateId as string;
+      
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        if (!stateId || stateId !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. State Administrators can only view audit logs for their assigned state." });
+        }
+      }
+
       let query = "SELECT * FROM audit_logs";
       let params: any[] = [];
       if (stateId) {
@@ -2205,6 +2350,14 @@ async function startServer() {
     try {
       const { id, operator, action, details, timestamp, stateId } = req.body;
       const activeState = await getFallbackStateId(stateId);
+      
+      const session = getSession(req);
+      if (session && session.roleLevel === 2) {
+        if (activeState !== session.assignedStateId) {
+          return res.status(403).json({ error: "Access denied. State Administrators can only create audit logs in their assigned state." });
+        }
+      }
+
       await pool.query(
         "INSERT INTO audit_logs (id, operator, action, details, timestamp, state_id) VALUES ($1, $2, $3, $4, $5, $6)",
         [id, operator, action, details, timestamp, activeState]
@@ -2219,6 +2372,11 @@ async function startServer() {
   // CLEAR DATA (For clean reset on command, keeps credentials)
   app.post('/api/clear-all-data', async (req, res) => {
     try {
+      const session = getSession(req);
+      if (!session || session.roleLevel !== 1) {
+        return res.status(403).json({ error: "Access denied. Only Supreme Root Administrators can clear all database bookings." });
+      }
+
       await pool.query("DELETE FROM bookings");
       await pool.query("DELETE FROM audit_logs");
       triggerQuietBackgroundSync();

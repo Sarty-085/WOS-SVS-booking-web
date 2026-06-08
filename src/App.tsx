@@ -101,6 +101,19 @@ export default function App() {
     }
   }, []);
 
+  // Strictly enforce state administrator boundary isolation
+  useEffect(() => {
+    if (adminSession && adminSession.roleLevel === 'state_admin' && adminSession.assignedStateId) {
+      const assigned = states.find(s => s.id === adminSession.assignedStateId);
+      if (assigned) {
+        if (!selectedState || selectedState.id !== assigned.id) {
+          setSelectedState(assigned);
+          localStorage.setItem('royal_slots_selected_state', JSON.stringify(assigned));
+        }
+      }
+    }
+  }, [adminSession, states, selectedState]);
+
   // Fetch state-specific data whenever selection pivots
   useEffect(() => {
     const fetchStateData = async () => {
@@ -713,6 +726,10 @@ export default function App() {
                 states={states}
                 selectedState={selectedState}
                 onSelectState={(st) => {
+                  if (adminSession && adminSession.roleLevel === 'state_admin' && st.id !== adminSession.assignedStateId) {
+                    alert("Access denied. Your administrative boundaries restrict operations to your assigned state only.");
+                    return;
+                  }
                   setSelectedState(st);
                   localStorage.setItem('royal_slots_selected_state', JSON.stringify(st));
                 }}
@@ -795,7 +812,7 @@ export default function App() {
                     
                     <div className="p-4 rounded-xl bg-slate-950 border border-slate-900 text-left font-mono text-xs text-slate-300 mb-6 flex flex-col gap-2.5">
                       <p>• Terminal Name: <span className="text-white font-bold">{adminUsername}</span></p>
-                      <p>• Permission Level: <span className="text-emerald-400 font-bold">Supreme Root Administrator [LEV 5]</span></p>
+                      <p>• Permission Level: <span className="text-emerald-400 font-bold">{adminSession?.roleLevel === 'root' ? 'Supreme Root Administrator [LEV 5]' : 'State Administrator'}</span></p>
                       <p>• Alliance Control Panel: <span className="text-white font-bold">Enabled</span></p>
                       <p>• Overrides & Evictions: <span className="text-white font-bold">ACTIVE</span></p>
                     </div>

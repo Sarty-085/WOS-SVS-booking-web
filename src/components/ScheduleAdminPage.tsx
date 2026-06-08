@@ -686,7 +686,7 @@ export default function ScheduleAdminPage({
                     {isAdmin ? adminUsername : 'Guest Commander'}
                   </p>
                   <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest leading-none">
-                    {isAdmin ? 'Clearance Lev 5' : 'Observation Mode'}
+                    {isAdmin ? (adminSession?.roleLevel === 'root' ? 'Supreme Root Administrator [LEV 5]' : 'State Administrator') : 'Observation Mode'}
                   </p>
                 </div>
               </div>
